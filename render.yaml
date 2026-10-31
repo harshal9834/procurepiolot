@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: procurepilot-ai
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.18.0
+      - key: APP_URL
+        fromService:
+          type: web
+          name: procurepilot-ai
+          property: host
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PAYPAL_BASE_URL
+        value: https://api-m.sandbox.paypal.com
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: UPLOAD_DIR
+        value: ./uploads
+      - key: MAX_UPLOAD_SIZE_MB
+        value: 10
