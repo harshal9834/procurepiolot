@@ -1,0 +1,2050 @@
+Build a complete, production-quality full-stack application called **ProcurePilot AI**.
+
+ProcurePilot AI is an intelligent procurement management and payment platform for businesses. It combines AI-powered procurement analysis, supplier quotation intelligence, inventory awareness, supplier risk analysis, procurement decision-making, human approval workflows, and secure PayPal payment execution.
+
+This must be a **complete application**, not a landing page or prototype dashboard.
+
+The application must include:
+
+- Authentication
+- Registration
+- Login
+- Forgot password
+- Reset password
+- Role-based access
+- Separate portals
+- Separate pages
+- Procurement management
+- Supplier management
+- Inventory management
+- Quotation management
+- AI analysis
+- Approval workflow
+- PayPal Sandbox payment
+- Payment history
+- Notifications
+- Audit logs
+- Profile/settings
+- Responsive UI
+- Database persistence
+- Seed/demo data
+- Error handling
+- Loading states
+- Empty states
+- Security controls
+
+---
+
+# 1. PRODUCT NAME
+
+**ProcurePilot AI**
+
+Tagline:
+
+**“Intelligent procurement. Explainable decisions. Secure payments.”**
+
+The core workflow is:
+
+**Request → Understand → Check Inventory → Collect Quotes → Analyze Suppliers → Calculate True Cost → Assess Risk → AI Recommendation → Human Approval → PayPal Payment → Audit**
+
+---
+
+# 2. USER ROLES
+
+Implement three separate roles.
+
+## Role 1: Company User
+
+Purpose:
+
+Creates and manages procurement requests.
+
+Permissions:
+
+- View dashboard
+- Create procurement request
+- View own procurement requests
+- Upload supplier quotations
+- View AI analysis
+- View suppliers
+- View inventory
+- View recommendations
+- Submit procurement for approval
+- View procurement history
+- View notifications
+- Manage own profile
+
+Cannot:
+
+- Execute final payment
+- Change approved payment amount
+- Approve own procurement request
+
+---
+
+## Role 2: Finance Approver
+
+Purpose:
+
+Reviews AI recommendations and authorizes payments.
+
+Permissions:
+
+- View finance dashboard
+- View all procurement requests
+- Review AI recommendations
+- Review supplier comparisons
+- Review risk analysis
+- Approve procurement
+- Reject procurement
+- Request changes
+- Authorize PayPal payment
+- View payment history
+- View supplier performance
+- View audit logs
+- View reports
+- Manage profile/settings
+
+Important:
+
+A finance approver must explicitly approve a procurement before PayPal payment can occur.
+
+---
+
+## Role 3: Supplier
+
+Purpose:
+
+Receives procurement orders and provides quotation information.
+
+Permissions:
+
+- Supplier dashboard
+- View assigned procurement requests
+- Submit quotation
+- Update quotation
+- View quotation status
+- View purchase orders
+- View payment status
+- View transaction history
+- Manage supplier profile
+- View notifications
+
+Supplier cannot:
+
+- Access another supplier's data
+- Approve procurement
+- Change company procurement decisions
+- Execute company payments
+
+---
+
+# 3. AUTHENTICATION SYSTEM
+
+Create a complete authentication system.
+
+Pages:
+
+```text
+/login
+/register
+/forgot-password
+/reset-password
+/verify-email
+```
+
+## Login Page
+
+Fields:
+
+- Email
+- Password
+- Remember me
+
+Actions:
+
+- Login
+- Forgot password
+- Create account
+
+Include:
+
+- Password visibility toggle
+- Validation
+- Loading state
+- Invalid credential message
+- Account disabled message
+- Session persistence
+
+After login:
+
+- Company User → `/company/dashboard`
+- Finance Approver → `/finance/dashboard`
+- Supplier → `/supplier/dashboard`
+
+---
+
+# 4. REGISTRATION
+
+Create a registration page.
+
+Fields:
+
+- Full name
+- Company name
+- Business email
+- Password
+- Confirm password
+- Role
+
+Roles available during registration:
+
+- Company User
+- Supplier
+
+Finance Approver should be created by company administration/seed data or controlled invitation rather than allowing unrestricted public registration.
+
+Validation:
+
+- Valid email
+- Strong password
+- Password confirmation
+- Required fields
+- Duplicate email prevention
+
+After registration:
+
+Create user profile and company/supplier record.
+
+---
+
+# 5. PASSWORD RECOVERY
+
+Forgot-password page:
+
+Field:
+
+- Email
+
+Show:
+
+> “If an account exists with this email, a password reset link has been sent.”
+
+Reset-password page:
+
+- New password
+- Confirm password
+
+After successful reset:
+
+Redirect to login.
+
+For development/demo mode, implement a functional reset flow without requiring a real email provider.
+
+---
+
+# 6. APPLICATION LAYOUT
+
+After authentication, use a common enterprise dashboard layout.
+
+Desktop:
+
+```text
+------------------------------------------------
+| Sidebar | Top Navigation                     |
+|         |                                    |
+|         | Main Content                       |
+|         |                                    |
+------------------------------------------------
+```
+
+Mobile:
+
+- Collapsible sidebar
+- Mobile navigation
+- Responsive tables/cards
+
+Sidebar should change based on role.
+
+---
+
+# 7. COMPANY USER PORTAL
+
+Routes:
+
+```text
+/company/dashboard
+/company/procurement
+/company/procurement/new
+/company/procurement/:id
+/company/suppliers
+/company/suppliers/:id
+/company/inventory
+/company/quotes
+/company/analytics
+/company/notifications
+/company/profile
+/company/settings
+```
+
+---
+
+# 8. COMPANY DASHBOARD
+
+Page:
+
+`/company/dashboard`
+
+Display:
+
+### Summary Cards
+
+- Active Procurement Requests
+- Pending Approvals
+- Total Spend
+- Estimated Savings
+- Supplier Count
+- High-Risk Suppliers
+
+Example:
+
+```text
+Active Requests       12
+Pending Approval       4
+Total Spend       ₹12.4L
+Estimated Savings ₹1.8L
+```
+
+### Recent Procurement
+
+Table:
+
+- Procurement ID
+- Item
+- Quantity
+- Recommended Supplier
+- Amount
+- AI Decision
+- Status
+- Created Date
+
+### AI Insights
+
+Examples:
+
+> “3 procurement requests can be reduced because existing inventory is sufficient.”
+
+> “Supplier B's latest quotation is 17% above historical pricing.”
+
+> “Two procurement requests exceed their approved budget.”
+
+### Quick Actions
+
+Buttons:
+
+- Create Procurement Request
+- Upload Quotation
+- View Approvals
+- View Suppliers
+
+---
+
+# 9. CREATE PROCUREMENT REQUEST
+
+Route:
+
+`/company/procurement/new`
+
+Create a professional multi-step form.
+
+## Step 1 — Request Details
+
+Fields:
+
+- Request title
+- Product/service
+- Description
+- Category
+- Quantity
+- Unit
+- Required delivery date
+- Priority
+
+Priority:
+
+- Low
+- Medium
+- High
+- Critical
+
+---
+
+## Step 2 — Budget
+
+Fields:
+
+- Maximum budget
+- Currency
+- Department
+- Cost center
+
+---
+
+## Step 3 — Business Justification
+
+Fields:
+
+- Why is this purchase required?
+- Expected business benefit
+- Optional notes
+
+---
+
+## Step 4 — Inventory
+
+Display:
+
+- Current inventory
+- Reserved inventory
+- Available inventory
+- Historical consumption
+- Estimated days of inventory remaining
+
+Allow manual inventory information if no inventory record exists.
+
+---
+
+## Step 5 — Review
+
+Display the complete request.
+
+Button:
+
+**Submit Procurement Request**
+
+After submission:
+
+Create unique ID:
+
+`PR-2026-00001`
+
+Status:
+
+`ANALYZING`
+
+---
+
+# 10. AI PROCUREMENT UNDERSTANDING
+
+When a request is submitted, AI analyzes the request.
+
+Extract:
+
+- Product
+- Quantity
+- Budget
+- Delivery requirement
+- Quality requirements
+- Business purpose
+- Priority
+- Constraints
+
+Display:
+
+### AI Understanding
+
+> “You are requesting 100 ergonomic office chairs with a maximum budget of ₹2,50,000 and delivery within 10 days.”
+
+Allow:
+
+**Confirm AI Understanding**
+
+or
+
+**Edit Requirements**
+
+The AI must not continue with incorrect assumptions without user confirmation.
+
+---
+
+# 11. INVENTORY ANALYSIS
+
+Before supplier selection, analyze inventory.
+
+Example:
+
+Requested:
+
+`100 units`
+
+Available:
+
+`35 units`
+
+AI:
+
+> “35 units are already available. Recommended purchase quantity: 65.”
+
+Display:
+
+```text
+Requested Quantity     100
+Available Inventory     35
+Recommended Purchase    65
+```
+
+Possible AI decisions:
+
+### DO NOT BUY
+
+Inventory is sufficient.
+
+### BUY LESS
+
+Existing inventory covers part of the requirement.
+
+### BUY FULL QUANTITY
+
+No sufficient inventory exists.
+
+### WAIT
+
+Current inventory is sufficient for the required period.
+
+---
+
+# 12. PROCUREMENT DETAIL PAGE
+
+Route:
+
+`/company/procurement/:id`
+
+This is the main procurement workspace.
+
+Sections:
+
+### Header
+
+- Procurement ID
+- Status
+- Priority
+- Created date
+
+### Requirement
+
+- Product
+- Quantity
+- Budget
+- Delivery requirement
+- Business justification
+
+### Inventory Analysis
+
+- Current inventory
+- Recommended quantity
+- Inventory reasoning
+
+### Supplier Quotes
+
+List uploaded quotations.
+
+### AI Analysis
+
+- Supplier scores
+- Price analysis
+- Quality
+- Delivery
+- Risk
+- Warranty
+- Reliability
+
+### AI Recommendation
+
+Large decision card.
+
+Example:
+
+> **BUY 65 UNITS FROM SUPPLIER A**
+
+Then show:
+
+- Recommended quantity
+- Supplier
+- Total cost
+- Confidence
+- Risk
+- Expected savings
+
+### Approval
+
+Display current approval status.
+
+### Payment
+
+Display PayPal status.
+
+### Audit Trail
+
+Display every important event.
+
+---
+
+# 13. SUPPLIER MANAGEMENT
+
+Company route:
+
+`/company/suppliers`
+
+Display:
+
+- Supplier name
+- Category
+- Risk
+- Reliability
+- Average price
+- Delivery score
+- Active quotations
+- Status
+
+Actions:
+
+- View
+- Edit
+- Disable
+
+---
+
+# 14. SUPPLIER DETAIL PAGE
+
+Route:
+
+`/company/suppliers/:id`
+
+Display:
+
+### Supplier Information
+
+- Company name
+- Contact
+- Email
+- Phone
+- Address
+- Categories
+
+### Performance
+
+- Overall score
+- Delivery score
+- Quality score
+- Reliability
+- Risk
+
+### Procurement History
+
+- Total orders
+- Total spend
+- Average delivery time
+- Late deliveries
+- Returns
+- Warranty claims
+
+### Historical Pricing
+
+Show historical quotation prices.
+
+Example:
+
+```text
+Previous average: ₹2,100
+Current quotation: ₹2,650
+Difference: +26.2%
+```
+
+AI explanation:
+
+> “The current quotation is significantly above the historical average.”
+
+---
+
+# 15. SUPPLIER PORTAL
+
+Supplier routes:
+
+```text
+/supplier/dashboard
+/supplier/procurements
+/supplier/procurements/:id
+/supplier/quotes
+/supplier/orders
+/supplier/payments
+/supplier/profile
+/supplier/settings
+/supplier/notifications
+```
+
+---
+
+# 16. SUPPLIER DASHBOARD
+
+Display:
+
+- Active Requests
+- Submitted Quotes
+- Accepted Quotes
+- Purchase Orders
+- Pending Payments
+- Total Received
+
+Recent requests table:
+
+- Request ID
+- Product
+- Quantity
+- Deadline
+- Quote status
+- Decision
+- Payment status
+
+---
+
+# 17. SUPPLIER QUOTATION PAGE
+
+Route:
+
+`/supplier/procurements/:id`
+
+Supplier can submit:
+
+- Product
+- Quantity
+- Unit price
+- Discount
+- Tax
+- Shipping
+- Delivery days
+- Warranty
+- Return policy
+- Payment terms
+- Additional notes
+- Supporting document
+
+Calculate:
+
+```text
+Subtotal
+Discount
+Shipping
+Tax
+Final Total
+```
+
+Button:
+
+**Submit Quotation**
+
+---
+
+# 18. QUOTATION MANAGEMENT
+
+Company route:
+
+`/company/quotes`
+
+Display:
+
+- Supplier
+- Procurement
+- Quotation amount
+- Delivery
+- Warranty
+- Risk
+- AI score
+- Status
+
+Allow:
+
+- View quotation
+- Compare quotations
+- Download uploaded document
+- Run AI analysis
+
+---
+
+# 19. QUOTATION DOCUMENT UPLOAD
+
+Allow company users to upload supplier quotation documents.
+
+Supported:
+
+- PDF
+- DOCX
+- CSV
+- Image
+
+After upload:
+
+```text
+Uploading
+↓
+Extracting
+↓
+Normalizing
+↓
+Validating
+↓
+AI Analysis
+```
+
+Extract:
+
+- Supplier
+- Product
+- Quantity
+- Unit price
+- Total
+- Tax
+- Shipping
+- Delivery
+- Warranty
+- Payment terms
+- Validity
+- Additional charges
+
+Show extracted information to the user.
+
+The user must be able to correct extraction errors.
+
+---
+
+# 20. SUPPLIER COMPARISON PAGE
+
+Create a dedicated comparison page.
+
+Route:
+
+`/company/procurement/:id/compare`
+
+Table:
+
+| Factor | Supplier A | Supplier B | Supplier C |
+|---|---:|---:|---:|
+| Total Cost | ₹2.35L | ₹2.18L | ₹2.60L |
+| Quality | 95 | 78 | 92 |
+| Delivery | 90 | 70 | 55 |
+| Warranty | 85 | 80 | 90 |
+| Reliability | 92 | 82 | 75 |
+| Risk | Low | Medium | High |
+| Overall Score | 91 | 82 | 78 |
+
+Highlight recommended supplier.
+
+---
+
+# 21. AI SCORING ENGINE
+
+Use configurable weights.
+
+Default:
+
+```text
+Price              30%
+Quality            20%
+Delivery           15%
+Reliability        15%
+Warranty           10%
+Risk               10%
+```
+
+Calculate:
+
+```text
+Final Score =
+Price Score × 0.30
++ Quality Score × 0.20
++ Delivery Score × 0.15
++ Reliability Score × 0.15
++ Warranty Score × 0.10
++ Risk Score × 0.10
+```
+
+Display individual scores and final score.
+
+Do not allow the LLM to invent numerical scores without supporting data.
+
+Use deterministic calculations for scoring.
+
+---
+
+# 22. TRUE COST ENGINE
+
+Calculate:
+
+```text
+Base Price
++ Shipping
++ Taxes
++ Installation
++ Expected Maintenance
++ Expected Risk Cost
+= Effective Cost
+```
+
+Display both:
+
+**Quoted Cost**
+
+and
+
+**Estimated Effective Cost**
+
+Explain differences.
+
+---
+
+# 23. SUPPLIER RISK ENGINE
+
+Calculate supplier risk using:
+
+- Historical performance
+- Late deliveries
+- Quality problems
+- Returns
+- Warranty claims
+- Price anomalies
+- Missing quotation information
+- Payment terms
+- Data completeness
+
+Risk levels:
+
+```text
+LOW
+MEDIUM
+HIGH
+CRITICAL
+```
+
+Display reasons.
+
+Example:
+
+> High Risk
+
+> 4 late deliveries in the last 6 orders.
+
+---
+
+# 24. AI DECISION ENGINE
+
+The final AI decision must support:
+
+```text
+BUY_NOW
+BUY_LESS
+WAIT
+NEGOTIATE
+REJECT
+SPLIT_PURCHASE
+```
+
+Example:
+
+```text
+Decision:
+BUY_LESS
+
+Recommended Quantity:
+65
+
+Supplier:
+Supplier A
+
+Expected Cost:
+₹1,52,750
+
+Confidence:
+92%
+
+Risk:
+LOW
+```
+
+Reasoning:
+
+- 35 units already available
+- Supplier A meets delivery requirement
+- Supplier A has highest quality score
+- Effective cost remains within budget
+- Supplier B is cheaper but has higher delivery risk
+
+---
+
+# 25. NEGOTIATION STATE
+
+If AI decides:
+
+`NEGOTIATE`
+
+Do not automatically pay.
+
+Display:
+
+> “Supplier A is preferred, but the current price is 12% above historical pricing.”
+
+Actions:
+
+**Request Better Price**
+
+**Accept Current Quote**
+
+**Reject**
+
+For MVP, negotiation can be simulated through a structured negotiation message.
+
+---
+
+# 26. AI CONFIDENCE
+
+Every AI recommendation must have:
+
+- Confidence
+- Supporting evidence
+- Key assumptions
+- Missing information
+
+Example:
+
+```text
+Confidence: 91%
+
+Supporting Evidence:
+✓ Historical supplier performance
+✓ Three supplier quotations
+✓ Inventory data
+✓ Budget data
+
+Assumptions:
+• Delivery date information is accurate
+
+Missing Information:
+• Installation cost from Supplier B
+```
+
+---
+
+# 27. FINANCE PORTAL
+
+Routes:
+
+```text
+/finance/dashboard
+/finance/approvals
+/finance/approvals/:id
+/finance/payments
+/finance/payments/:id
+/finance/suppliers
+/finance/reports
+/finance/audit
+/finance/notifications
+/finance/profile
+/finance/settings
+```
+
+---
+
+# 28. FINANCE DASHBOARD
+
+Display:
+
+- Pending approvals
+- Approved purchases
+- Total approved spend
+- Total payments
+- Estimated savings
+- High-risk procurement
+- Failed payments
+
+Recent approvals:
+
+- Procurement ID
+- Supplier
+- Amount
+- AI score
+- Risk
+- Status
+- Date
+
+---
+
+# 29. APPROVAL PAGE
+
+Route:
+
+`/finance/approvals/:id`
+
+Display:
+
+### Procurement Summary
+
+### Inventory Analysis
+
+### Supplier Comparison
+
+### AI Recommendation
+
+### Risk Analysis
+
+### Budget
+
+### Supporting Documents
+
+### Audit Trail
+
+At bottom:
+
+**Approve & Pay**
+
+**Reject**
+
+**Request Changes**
+
+---
+
+# 30. APPROVAL RULES
+
+Finance approver cannot approve:
+
+- Invalid procurement
+- Missing supplier
+- Missing amount
+- Amount above configured approval limit without escalation
+- Supplier marked critical risk
+- Procurement already paid
+
+When approving:
+
+Create approval record:
+
+```text
+approved_by
+approved_at
+approved_amount
+approved_supplier
+approval_comment
+```
+
+The approved supplier and amount become immutable for payment.
+
+---
+
+# 31. PAYPAL PAYMENT SYSTEM
+
+Use PayPal Sandbox.
+
+Environment:
+
+```env
+PAYPAL_CLIENT_ID=""
+PAYPAL_CLIENT_SECRET=""
+PAYPAL_BASE_URL="https://api-m.sandbox.paypal.com"
+```
+
+Backend must handle:
+
+### Create Order
+
+Create PayPal order using the approved amount.
+
+### Approve Order
+
+User completes PayPal Sandbox approval.
+
+### Capture Order
+
+Capture only after PayPal authorization.
+
+Store:
+
+- PayPal order ID
+- Capture ID
+- Amount
+- Currency
+- Status
+- Timestamp
+- Procurement ID
+- Supplier ID
+
+---
+
+# 32. PAYMENT SECURITY
+
+The frontend must never directly hold the PayPal secret.
+
+Only backend can access:
+
+```text
+PAYPAL_CLIENT_ID
+PAYPAL_CLIENT_SECRET
+```
+
+Before payment:
+
+```text
+procurement.status == APPROVED
+```
+
+Verify:
+
+```text
+approvedSupplier == paymentSupplier
+approvedAmount == paymentAmount
+```
+
+If mismatch:
+
+**BLOCK PAYMENT**
+
+---
+
+# 33. PAYMENT PAGE
+
+Route:
+
+`/finance/payments/:id`
+
+Display:
+
+```text
+Procurement ID
+Supplier
+Approved Amount
+Currency
+PayPal Order ID
+Payment Status
+Approved By
+Approval Time
+```
+
+Button:
+
+**Pay with PayPal**
+
+After successful payment:
+
+Display:
+
+> Payment successfully completed.
+
+Show:
+
+- Transaction ID
+- Amount
+- Supplier
+- Procurement ID
+- Date/time
+
+---
+
+# 34. PAYMENT HISTORY
+
+Route:
+
+`/finance/payments`
+
+Table:
+
+- Payment ID
+- Procurement ID
+- Supplier
+- Amount
+- PayPal Order ID
+- Status
+- Date
+
+Statuses:
+
+- Pending
+- Approved
+- Completed
+- Failed
+- Cancelled
+- Refunded
+
+---
+
+# 35. COMPANY PAYMENT HISTORY
+
+Company users can see their procurement payment history but cannot modify payments.
+
+Route:
+
+`/company/analytics/payments`
+
+---
+
+# 36. NOTIFICATION SYSTEM
+
+Create notifications for:
+
+### Company User
+
+- Procurement submitted
+- AI analysis completed
+- Quote received
+- Approval required
+- Procurement approved
+- Payment completed
+- Procurement rejected
+
+### Finance
+
+- New approval
+- High-risk procurement
+- Budget violation
+- Payment failure
+
+### Supplier
+
+- New procurement request
+- Quote accepted
+- Quote rejected
+- Purchase order created
+- Payment completed
+
+Include:
+
+- Notification bell
+- Unread count
+- Notifications page
+- Mark as read
+
+---
+
+# 37. AUDIT LOG
+
+Create immutable audit records.
+
+Track:
+
+- Login
+- Procurement creation
+- Procurement modification
+- Quote upload
+- AI analysis
+- Recommendation
+- Approval
+- Rejection
+- PayPal order creation
+- PayPal payment
+- Payment failure
+
+Example:
+
+```text
+10:30
+John created PR-2026-0001
+
+10:32
+AI analysis completed
+
+10:34
+AI recommended Supplier A
+
+10:40
+Finance approved ₹1,52,750
+
+10:41
+PayPal order created
+
+10:43
+Payment completed
+```
+
+Route:
+
+`/finance/audit`
+
+---
+
+# 38. ANALYTICS
+
+Company analytics page:
+
+`/company/analytics`
+
+Display:
+
+- Total spend
+- Monthly spend
+- Procurement count
+- Average procurement value
+- Estimated AI savings
+- Supplier performance
+- Average procurement time
+- High-risk procurement count
+
+Charts:
+
+- Monthly spend
+- Supplier spend
+- Category spend
+- AI savings
+- Procurement status
+
+---
+
+# 39. FINANCE REPORTS
+
+Route:
+
+`/finance/reports`
+
+Include:
+
+- Total spend
+- Spend by supplier
+- Spend by department
+- Approved vs rejected
+- AI savings
+- Payment success rate
+- Procurement cycle time
+
+Allow date filtering.
+
+---
+
+# 40. INVENTORY MANAGEMENT
+
+Company route:
+
+`/company/inventory`
+
+Table:
+
+- SKU
+- Product
+- Category
+- Current quantity
+- Reserved quantity
+- Available quantity
+- Reorder threshold
+- Last updated
+
+Actions:
+
+- Add inventory
+- Edit inventory
+- Adjust quantity
+- View history
+
+AI should use inventory information when making procurement decisions.
+
+---
+
+# 41. INVENTORY DETAIL
+
+Display:
+
+- Current stock
+- Consumption history
+- Average monthly consumption
+- Estimated days remaining
+- Reorder threshold
+- Open procurement requests
+
+AI insight:
+
+> “Current inventory is expected to last 18 days. The requested delivery time is 10 days, so procurement should begin now.”
+
+---
+
+# 42. PROFILE PAGE
+
+Each role has:
+
+`/profile`
+
+Display:
+
+- Name
+- Email
+- Phone
+- Profile photo
+- Company
+- Role
+
+Allow editing non-sensitive profile information.
+
+---
+
+# 43. SETTINGS
+
+Include:
+
+### Account Settings
+
+- Name
+- Email
+- Password
+
+### Procurement Settings
+
+- Default currency
+- Default approval threshold
+- Default scoring weights
+
+### Notification Settings
+
+- Email notifications
+- In-app notifications
+
+### Security
+
+- Session management
+- Logout
+
+---
+
+# 44. ROLE-BASED ROUTE PROTECTION
+
+Implement middleware/guards.
+
+A company user must not access:
+
+```text
+/finance/*
+/supplier/*
+```
+
+A supplier must not access:
+
+```text
+/company/*
+/finance/*
+```
+
+Finance users must not access supplier-only operations.
+
+Unauthorized access returns:
+
+`403 Forbidden`
+
+---
+
+# 45. DATABASE
+
+Use PostgreSQL.
+
+Tables:
+
+```text
+users
+companies
+suppliers
+supplier_users
+procurement_requests
+procurement_items
+inventory
+inventory_transactions
+supplier_quotes
+quote_items
+supplier_performance
+ai_analyses
+ai_recommendations
+approvals
+paypal_orders
+payments
+notifications
+audit_logs
+password_reset_tokens
+sessions
+```
+
+Use proper:
+
+- Primary keys
+- Foreign keys
+- Indexes
+- Timestamps
+- Status enums
+
+---
+
+# 46. AI ARCHITECTURE
+
+Use LangGraph.
+
+Workflow:
+
+```text
+Procurement Request
+        ↓
+Requirement Agent
+        ↓
+Inventory Agent
+        ↓
+Quote Extraction Agent
+        ↓
+Supplier Evaluation Agent
+        ↓
+Cost Analysis Agent
+        ↓
+Risk Agent
+        ↓
+Decision Agent
+        ↓
+Explanation Agent
+        ↓
+Human Approval
+        ↓
+Payment Service
+        ↓
+PayPal
+```
+
+Important:
+
+**AI must stop at the approval boundary.**
+
+The AI must never independently execute payment.
+
+---
+
+# 47. AI OUTPUT FORMAT
+
+Every AI decision must return structured JSON.
+
+Example:
+
+```json
+{
+  "decision": "BUY_LESS",
+  "recommended_quantity": 65,
+  "recommended_supplier_id": "SUP-001",
+  "estimated_total_cost": 152750,
+  "confidence": 0.92,
+  "risk_level": "LOW",
+  "reasons": [
+    "35 units are already available",
+    "Supplier A meets delivery requirements",
+    "Supplier A has the highest overall supplier score"
+  ],
+  "warnings": [],
+  "missing_information": []
+}
+```
+
+Validate the response before storing it.
+
+---
+
+# 48. DEMO DATA
+
+Seed the database with:
+
+### Company
+
+`Acme Technologies`
+
+### Users
+
+Company user:
+
+`procurement@acme.test`
+
+Finance:
+
+`finance@acme.test`
+
+Supplier accounts:
+
+`supplier-a@test.com`
+
+`supplier-b@test.com`
+
+`supplier-c@test.com`
+
+Use clearly documented demo passwords.
+
+---
+
+# 49. DEMO PROCUREMENT
+
+Create:
+
+**100 ergonomic office chairs**
+
+Budget:
+
+**₹2,50,000**
+
+Existing inventory:
+
+**35**
+
+Supplier A:
+
+- Total: ₹2,35,000 for 100
+- Strong quality
+- 7-day delivery
+- Low risk
+
+Supplier B:
+
+- Total: ₹2,18,000
+- Lower quality
+- 14-day delivery
+- Medium risk
+
+Supplier C:
+
+- Total: ₹2,60,000
+- High quality
+- 20-day delivery
+- High risk
+
+AI should conclude:
+
+> Purchase 65 units from Supplier A.
+
+The final payment should reflect the approved quantity and supplier.
+
+---
+
+# 50. UI STATUS SYSTEM
+
+Use consistent statuses.
+
+Procurement:
+
+```text
+DRAFT
+ANALYZING
+QUOTES_PENDING
+ANALYZED
+PENDING_APPROVAL
+APPROVED
+REJECTED
+PAYMENT_PENDING
+PAID
+COMPLETED
+```
+
+Quotation:
+
+```text
+DRAFT
+SUBMITTED
+ANALYZING
+ANALYZED
+ACCEPTED
+REJECTED
+```
+
+Payment:
+
+```text
+PENDING
+PROCESSING
+COMPLETED
+FAILED
+CANCELLED
+REFUNDED
+```
+
+---
+
+# 51. LOADING STATES
+
+Every asynchronous operation must have a loading state.
+
+Examples:
+
+- Login
+- Registration
+- AI analysis
+- File upload
+- Quote extraction
+- Supplier scoring
+- Approval
+- PayPal order creation
+- Payment capture
+
+Use skeleton loaders where appropriate.
+
+---
+
+# 52. EMPTY STATES
+
+Every list page must have a useful empty state.
+
+Example:
+
+> No procurement requests yet.
+
+Button:
+
+**Create Procurement Request**
+
+---
+
+# 53. ERROR STATES
+
+Show clear errors.
+
+Examples:
+
+> Unable to analyze quotation. Please verify the document and try again.
+
+> PayPal payment could not be completed.
+
+> You are not authorized to approve this procurement.
+
+Never expose stack traces to users.
+
+---
+
+# 54. API STRUCTURE
+
+Create REST endpoints.
+
+Authentication:
+
+```text
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout
+POST /api/auth/forgot-password
+POST /api/auth/reset-password
+GET  /api/auth/me
+```
+
+Procurement:
+
+```text
+GET    /api/procurements
+POST   /api/procurements
+GET    /api/procurements/:id
+PUT    /api/procurements/:id
+POST   /api/procurements/:id/analyze
+POST   /api/procurements/:id/submit
+```
+
+Quotes:
+
+```text
+GET  /api/procurements/:id/quotes
+POST /api/procurements/:id/quotes
+POST /api/quotes/:id/analyze
+```
+
+Suppliers:
+
+```text
+GET /api/suppliers
+GET /api/suppliers/:id
+POST /api/suppliers
+PUT /api/suppliers/:id
+```
+
+Inventory:
+
+```text
+GET /api/inventory
+POST /api/inventory
+PUT /api/inventory/:id
+```
+
+Approvals:
+
+```text
+GET  /api/approvals
+GET  /api/approvals/:id
+POST /api/approvals/:id/approve
+POST /api/approvals/:id/reject
+POST /api/approvals/:id/request-changes
+```
+
+Payments:
+
+```text
+POST /api/payments/paypal/create-order
+POST /api/payments/paypal/capture-order
+GET  /api/payments
+GET  /api/payments/:id
+```
+
+Notifications:
+
+```text
+GET  /api/notifications
+POST /api/notifications/:id/read
+```
+
+Audit:
+
+```text
+GET /api/audit
+```
+
+---
+
+# 55. FILE STRUCTURE
+
+Use a clean structure similar to:
+
+```text
+procurepilot/
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── layouts/
+│   │   ├── pages/
+│   │   │   ├── auth/
+│   │   │   ├── company/
+│   │   │   ├── finance/
+│   │   │   └── supplier/
+│   │   ├── hooks/
+│   │   ├── services/
+│   │   ├── store/
+│   │   ├── types/
+│   │   └── utils/
+│   └── package.json
+│
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   ├── models/
+│   │   ├── schemas/
+│   │   ├── services/
+│   │   ├── agents/
+│   │   ├── paypal/
+│   │   ├── auth/
+│   │   └── utils/
+│   ├── migrations/
+│   ├── seed/
+│   └── requirements.txt
+│
+├── uploads/
+├── .env.example
+├── README.md
+└── docker-compose.yml
+```
+
+---
+
+# 56. ENVIRONMENT VARIABLES
+
+Create:
+
+`.env.example`
+
+```env
+DATABASE_URL=
+
+JWT_SECRET=
+
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com
+
+OLLAMA_BASE_URL=http://localhost:11434
+LLM_MODEL=
+
+UPLOAD_DIR=./uploads
+```
+
+Never commit `.env`.
+
+Add `.env` to `.gitignore`.
+
+---
+
+# 57. PAYPAL SANDBOX
+
+Use PayPal Sandbox only for development/demo.
+
+The payment flow must be:
+
+```text
+Procurement Request
+        ↓
+AI Recommendation
+        ↓
+Finance Approval
+        ↓
+Create PayPal Order
+        ↓
+PayPal Sandbox Approval
+        ↓
+Capture Payment
+        ↓
+Payment Confirmation
+        ↓
+Update Procurement
+        ↓
+Audit Log
+```
+
+The application must display the PayPal order ID and transaction status after payment.
+
+---
+
+# 58. README
+
+Create a professional README containing:
+
+- Product overview
+- Problem
+- Solution
+- Key features
+- Architecture
+- AI architecture
+- PayPal integration
+- Tech stack
+- Installation
+- Environment variables
+- Database setup
+- Running frontend
+- Running backend
+- Ollama setup
+- PayPal Sandbox setup
+- Demo accounts
+- Demo workflow
+- Security considerations
+- Future improvements
+- Open-source license
+
+---
+
+# 59. FINAL PRODUCT EXPERIENCE
+
+The application should feel like a real enterprise product.
+
+A judge should be able to:
+
+1. Register/login.
+2. Enter a procurement request.
+3. See AI understand the request.
+4. See existing inventory.
+5. Upload supplier quotations.
+6. Watch AI extract quotation information.
+7. Compare suppliers.
+8. See true cost.
+9. See supplier risk.
+10. Receive a clear AI recommendation.
+11. Log into Finance.
+12. Review the recommendation.
+13. Approve the purchase.
+14. Pay through PayPal Sandbox.
+15. See the completed transaction.
+16. Open the audit trail and see the entire procurement lifecycle.
+
+The central experience must clearly demonstrate:
+
+**ProcurePilot AI makes procurement decisions intelligently, but humans retain financial control. PayPal provides the secure execution layer for the approved transaction.**
+
+Do not build only static mockups.
+
+All major buttons, forms, authentication flows, database operations, AI analysis, role permissions, quotation processing, approval workflow, and PayPal Sandbox payment flow must be functional.

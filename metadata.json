@@ -1,0 +1,8 @@
+{
+  "name": "ProcurePilot AI",
+  "description": "Intelligent AI-powered procurement decision and payment platform for SMBs with explainable evaluation, inventory intelligence, and PayPal Sandbox payment authorization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
