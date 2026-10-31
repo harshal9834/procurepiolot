@@ -1,27 +1,17 @@
 import React from 'react';
-import {
-  User,
-  UserRole
-} from '../../types';
+import { User } from '../../types';
 import {
   LayoutDashboard,
   FileText,
   PlusCircle,
-  Building2,
-  Package,
-  Layers,
-  BarChart3,
-  Bell,
+  Clock,
   CheckCircle2,
-  Wallet,
-  ShieldAlert,
-  FileCheck2,
-  History,
-  Store,
   DollarSign,
   UserCircle,
-  Settings,
   LogOut,
+  ShoppingBag,
+  CreditCard,
+  Building2,
   Sparkles
 } from 'lucide-react';
 
@@ -30,29 +20,29 @@ interface SidebarProps {
   currentRoute: string;
   onNavigate: (route: string) => void;
   onLogout: () => void;
-  unreadNotificationsCount: number;
+  unreadNotificationsCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   currentRoute,
   onNavigate,
-  onLogout,
-  unreadNotificationsCount
+  onLogout
 }) => {
   const role = currentUser.role;
 
   const renderNavLinks = () => {
     if (role === 'COMPANY_USER') {
+      // REQUESTER ROLE
       return (
         <>
           <div className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-            Company Portal
+            Requester Portal
           </div>
           <button
-            onClick={() => onNavigate('/company/dashboard')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute === '/company/dashboard'
+            onClick={() => onNavigate('/requester/dashboard')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+              currentRoute === '/requester/dashboard' || currentRoute === '/company/dashboard'
                 ? 'bg-indigo-50 text-indigo-700'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
@@ -62,147 +52,76 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           <button
-            onClick={() => onNavigate('/company/procurement')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute === '/company/procurement' || currentRoute.startsWith('/company/procurement/') && currentRoute !== '/company/procurement/new'
+            onClick={() => onNavigate('/requester/requests')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+              currentRoute === '/requester/requests' || (currentRoute.startsWith('/requester/requests/') && currentRoute !== '/requester/request/new')
                 ? 'bg-indigo-50 text-indigo-700'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <FileText className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Procurements</span>
+            <span>My Requests</span>
           </button>
 
           <button
-            onClick={() => onNavigate('/company/procurement/new')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute === '/company/procurement/new'
+            onClick={() => onNavigate('/requester/request/new')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+              currentRoute === '/requester/request/new'
                 ? 'bg-indigo-50 text-indigo-700'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <PlusCircle className="w-4 h-4 shrink-0 text-indigo-600" />
-            <span className="text-indigo-600 font-bold">New Request</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('/company/inventory')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute === '/company/inventory'
-                ? 'bg-indigo-50 text-indigo-700'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <Package className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Inventory Depots</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('/company/suppliers')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute.startsWith('/company/suppliers')
-                ? 'bg-indigo-50 text-indigo-700'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <Building2 className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Supplier Network</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('/company/quotes')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute === '/company/quotes'
-                ? 'bg-indigo-50 text-indigo-700'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <Layers className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Quotations Hub</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('/company/analytics')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute === '/company/analytics'
-                ? 'bg-indigo-50 text-indigo-700'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Spend Analytics</span>
+            <span className="text-indigo-600 font-bold">Create Request</span>
           </button>
         </>
       );
     } else if (role === 'FINANCE_APPROVER') {
+      // FINANCE ROLE
       return (
         <>
           <div className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-            Treasury & Approvals
+            Finance Portal
           </div>
           <button
             onClick={() => onNavigate('/finance/dashboard')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
               currentRoute === '/finance/dashboard'
                 ? 'bg-emerald-50 text-emerald-800'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <LayoutDashboard className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Treasury Console</span>
+            <span>Dashboard</span>
           </button>
 
           <button
-            onClick={() => onNavigate('/finance/approvals')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute.startsWith('/finance/approvals')
+            onClick={() => onNavigate('/finance/pending')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+              currentRoute === '/finance/pending' || currentRoute.startsWith('/finance/approvals')
                 ? 'bg-emerald-50 text-emerald-800'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-            <span>Approval Queue</span>
+            <Clock className="w-4 h-4 shrink-0 text-amber-500" />
+            <span>Pending Payments</span>
           </button>
 
           <button
             onClick={() => onNavigate('/finance/payments')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute.startsWith('/finance/payments')
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+              currentRoute === '/finance/payments'
                 ? 'bg-emerald-50 text-emerald-800'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
-            <Wallet className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>PayPal Settlements</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('/finance/reports')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute === '/finance/reports'
-                ? 'bg-emerald-50 text-emerald-800'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Finance Reports</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('/finance/audit')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute === '/finance/audit'
-                ? 'bg-emerald-50 text-emerald-800'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <History className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Immutable Audit Log</span>
+            <CreditCard className="w-4 h-4 shrink-0 text-slate-400" />
+            <span>Payment History</span>
           </button>
         </>
       );
     } else {
-      // SUPPLIER
+      // SUPPLIER ROLE
       return (
         <>
           <div className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
@@ -210,50 +129,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <button
             onClick={() => onNavigate('/supplier/dashboard')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
               currentRoute === '/supplier/dashboard'
                 ? 'bg-amber-50 text-amber-800'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <LayoutDashboard className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Vendor Overview</span>
+            <span>Dashboard</span>
           </button>
 
           <button
-            onClick={() => onNavigate('/supplier/procurements')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-              currentRoute.startsWith('/supplier/procurements')
+            onClick={() => onNavigate('/supplier/requests')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+              currentRoute === '/supplier/requests' || currentRoute.startsWith('/supplier/quote/') || currentRoute.startsWith('/supplier/procurements/')
                 ? 'bg-amber-50 text-amber-800'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <FileText className="w-4 h-4 shrink-0 text-amber-600" />
-            <span>Assigned RFQs</span>
+            <span>Requests</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('/supplier/quotes')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+              currentRoute === '/supplier/quotes'
+                ? 'bg-amber-50 text-amber-800'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-slate-400" />
+            <span>My Quotes</span>
           </button>
 
           <button
             onClick={() => onNavigate('/supplier/orders')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
               currentRoute === '/supplier/orders'
                 ? 'bg-amber-50 text-amber-800'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
-            <Store className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Purchase Orders</span>
+            <ShoppingBag className="w-4 h-4 shrink-0 text-slate-400" />
+            <span>Orders</span>
           </button>
 
           <button
             onClick={() => onNavigate('/supplier/payments')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
               currentRoute === '/supplier/payments'
                 ? 'bg-amber-50 text-amber-800'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <DollarSign className="w-4 h-4 shrink-0 text-slate-400" />
-            <span>Settled Payments</span>
+            <span>Payments</span>
           </button>
         </>
       );
@@ -265,15 +196,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Brand & Wordmark */}
       <div>
         <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-100">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white text-sm">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white text-sm shadow-sm">
             P
           </div>
           <div>
-            <div className="text-sm font-bold text-slate-900 tracking-tight">
-              ProcurePilot AI
+            <div className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
+              <span>ProcurePilot</span>
+              <span className="text-[10px] px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded-sm font-mono font-bold">
+                AI
+              </span>
             </div>
-            <div className="text-[10px] text-slate-400 font-mono">
-              Enterprise v2.4
+            <div className="text-[10px] text-slate-400">
+              Procure-to-Pay Platform
             </div>
           </div>
         </div>
@@ -282,53 +216,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4 space-y-1 overflow-y-auto">
           {renderNavLinks()}
 
-          {/* Common Links */}
+          {/* User Profile Link */}
           <div className="pt-4 mt-4 border-t border-slate-100">
-            <div className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-              System & Account
-            </div>
-
-            <button
-              onClick={() => onNavigate('/notifications')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                currentRoute === '/notifications'
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Bell className="w-4 h-4 text-slate-400" />
-                <span>Notifications</span>
-              </div>
-              {unreadNotificationsCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-mono font-bold">
-                  {unreadNotificationsCount}
-                </span>
-              )}
-            </button>
-
             <button
               onClick={() => onNavigate('/profile')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
                 currentRoute === '/profile'
                   ? 'bg-slate-100 text-slate-900'
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               <UserCircle className="w-4 h-4 text-slate-400" />
-              <span>User Profile</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('/settings')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                currentRoute === '/settings'
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <Settings className="w-4 h-4 text-slate-400" />
-              <span>Settings</span>
+              <span>Profile</span>
             </button>
           </div>
         </div>
@@ -339,7 +238,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
-              {currentUser.avatarInitials}
+              {currentUser.avatarInitials || currentUser.name.slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0">
               <div className="text-xs font-bold text-slate-900 truncate">

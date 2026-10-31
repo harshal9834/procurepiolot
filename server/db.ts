@@ -1,3 +1,6 @@
+import { DatabaseSync } from 'node:sqlite';
+import path from 'path';
+import bcrypt from 'bcryptjs';
 import {
   ProcurementRequest,
   InventoryItem,
@@ -10,88 +13,305 @@ import {
 } from './types';
 
 export class ProcurementDatabase {
-  private users: User[] = [];
-  private inventory: InventoryItem[] = [];
-  private suppliers: Supplier[] = [];
-  private history: HistoricalPurchase[] = [];
-  private requests: Map<string, ProcurementRequest> = new Map();
-  private notifications: AppNotification[] = [];
-  private payments: PayPalPaymentRecord[] = [];
-  private globalAuditLogs: AuditLogEntry[] = [];
-  private resetTokens: Map<string, string> = new Map(); // token -> email
+  private sqlite: DatabaseSync;
 
   constructor() {
-    this.seedInitialData();
+    const rawUrl = process.env.DATABASE_URL || './procurepilot.db';
+    let dbPath = rawUrl;
+    if (dbPath.startsWith('sqlite+aiosqlite:///')) {
+      dbPath = dbPath.replace('sqlite+aiosqlite:///', '');
+    } else if (dbPath.startsWith('sqlite:///')) {
+      dbPath = dbPath.replace('sqlite:///', '');
+    } else if (dbPath.startsWith('sqlite://')) {
+      dbPath = dbPath.replace('sqlite://', '');
+    }
+
+    const resolvedPath = path.resolve(process.cwd(), dbPath);
+    this.sqlite = new DatabaseSync(resolvedPath);
+    this.sqlite.exec('PRAGMA journal_mode = WAL;');
+    this.sqlite.exec('PRAGMA foreign_keys = ON;');
+
+    this.initTables();
+    this.checkAndSeed();
   }
 
-  public seedInitialData() {
-    this.users = [
+  private initTables(): void {
+    this.sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        company_name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        department TEXT,
+        phone TEXT,
+        avatar_initials TEXT NOT NULL,
+        supplier_id TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS inventory (
+        id TEXT PRIMARY KEY,
+        sku TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        current_quantity INTEGER NOT NULL,
+        reserved_quantity INTEGER NOT NULL DEFAULT 0,
+        available_quantity INTEGER NOT NULL,
+        reorder_threshold INTEGER NOT NULL DEFAULT 5,
+        warehouse_location TEXT NOT NULL,
+        condition TEXT NOT NULL,
+        unit_cost REAL NOT NULL,
+        monthly_consumption INTEGER NOT NULL DEFAULT 0,
+        estimated_days_remaining INTEGER NOT NULL DEFAULT 0,
+        last_updated TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id TEXT PRIMARY KEY,
+        code TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        contact_person TEXT,
+        email TEXT NOT NULL,
+        phone TEXT,
+        address TEXT,
+        categories TEXT NOT NULL,
+        payment_terms TEXT NOT NULL,
+        gst_number TEXT,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        performance TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS historical_purchases (
+        id TEXT PRIMARY KEY,
+        item_code TEXT NOT NULL,
+        item_name TEXT NOT NULL,
+        supplier_id TEXT NOT NULL,
+        supplier_name TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        unit_price REAL NOT NULL,
+        total_price REAL NOT NULL,
+        purchase_date TEXT NOT NULL,
+        on_time_delivery INTEGER NOT NULL,
+        quality_rating REAL NOT NULL,
+        warranty_issues_reported INTEGER NOT NULL,
+        payment_method TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS procurement_requests (
+        id TEXT PRIMARY KEY,
+        code TEXT UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        product_service TEXT NOT NULL,
+        description TEXT,
+        category TEXT NOT NULL,
+        requested_quantity INTEGER NOT NULL,
+        unit TEXT NOT NULL,
+        max_budget REAL NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'INR',
+        cost_center TEXT,
+        delivery_required_days INTEGER NOT NULL,
+        delivery_deadline_date TEXT NOT NULL,
+        department TEXT NOT NULL,
+        business_justification TEXT,
+        expected_benefit TEXT,
+        priority TEXT NOT NULL DEFAULT 'medium',
+        policy_constraints TEXT,
+        created_by TEXT NOT NULL,
+        creator_email TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        status TEXT NOT NULL,
+        data_json TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS payments (
+        id TEXT PRIMARY KEY,
+        order_id TEXT NOT NULL,
+        capture_id TEXT NOT NULL,
+        procurement_id TEXT NOT NULL,
+        procurement_code TEXT NOT NULL,
+        status TEXT NOT NULL,
+        supplier_id TEXT NOT NULL,
+        supplier_name TEXT NOT NULL,
+        supplier_paypal_account TEXT NOT NULL,
+        amount REAL NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'INR',
+        authorized_by TEXT NOT NULL,
+        authorized_at TEXT NOT NULL,
+        captured_at TEXT NOT NULL,
+        validation_check_passed INTEGER NOT NULL DEFAULT 1,
+        data_json TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS paypal_orders (
+        id TEXT PRIMARY KEY,
+        paypal_order_id TEXT UNIQUE NOT NULL,
+        procurement_id TEXT NOT NULL,
+        supplier_id TEXT NOT NULL,
+        supplier_name TEXT NOT NULL,
+        amount REAL NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'INR',
+        converted_amount REAL,
+        converted_currency TEXT,
+        status TEXT NOT NULL,
+        approval_url TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (procurement_id) REFERENCES procurement_requests(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS notifications (
+        id TEXT PRIMARY KEY,
+        role TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        type TEXT NOT NULL,
+        link TEXT,
+        read INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id TEXT PRIMARY KEY,
+        timestamp TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        actor_role TEXT NOT NULL,
+        action TEXT NOT NULL,
+        details TEXT NOT NULL,
+        procurement_id TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS reset_tokens (
+        token TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL
+      );
+    `);
+  }
+
+  private checkAndSeed(): void {
+    const userCount = this.sqlite.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+    if (!userCount || userCount.count === 0) {
+      this.seedInitialData();
+    }
+  }
+
+  public seedInitialData(): void {
+    // Clear existing records
+    this.sqlite.exec(`
+      DELETE FROM reset_tokens;
+      DELETE FROM audit_logs;
+      DELETE FROM notifications;
+      DELETE FROM payments;
+      DELETE FROM procurement_requests;
+      DELETE FROM historical_purchases;
+      DELETE FROM suppliers;
+      DELETE FROM inventory;
+      DELETE FROM users;
+    `);
+
+    const defaultHashedPassword = bcrypt.hashSync('demo123', 10);
+
+    // 1. Users
+    const insertUser = this.sqlite.prepare(`
+      INSERT INTO users (id, name, email, password_hash, company_name, role, department, phone, avatar_initials, supplier_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const seedUsers = [
       {
         id: 'usr_company_1',
         name: 'Rajesh Sharma',
         email: 'procurement@acme.test',
-        password: 'demo123',
-        companyName: 'Acme Technologies Pvt Ltd',
+        password_hash: defaultHashedPassword,
+        company_name: 'Acme Technologies Pvt Ltd',
         role: 'COMPANY_USER',
         department: 'Workplace & Facilities',
         phone: '+91 98450 11223',
-        avatarInitials: 'RS',
-        createdAt: '2026-01-15T09:00:00Z'
+        avatar_initials: 'RS',
+        supplier_id: null,
+        created_at: '2026-01-15T09:00:00Z'
       },
       {
         id: 'usr_finance_1',
         name: 'Ananya Roy',
         email: 'finance@acme.test',
-        password: 'demo123',
-        companyName: 'Acme Technologies Pvt Ltd',
+        password_hash: defaultHashedPassword,
+        company_name: 'Acme Technologies Pvt Ltd',
         role: 'FINANCE_APPROVER',
         department: 'Corporate Treasury & Finance',
         phone: '+91 98200 44556',
-        avatarInitials: 'AR',
-        createdAt: '2026-01-10T09:00:00Z'
+        avatar_initials: 'AR',
+        supplier_id: null,
+        created_at: '2026-01-10T09:00:00Z'
       },
       {
         id: 'usr_supplier_a',
         name: 'Vikram Mehta',
         email: 'supplier-a@test.com',
-        password: 'demo123',
-        companyName: 'Apex Ergonomics Pvt Ltd',
+        password_hash: defaultHashedPassword,
+        company_name: 'Apex Ergonomics Pvt Ltd',
         role: 'SUPPLIER',
         department: 'Commercial Sales',
         phone: '+91 98450 12345',
-        avatarInitials: 'VM',
-        supplierId: 'supp_apex',
-        createdAt: '2026-02-01T09:00:00Z'
+        avatar_initials: 'VM',
+        supplier_id: 'supp_apex',
+        created_at: '2026-02-01T09:00:00Z'
       },
       {
         id: 'usr_supplier_b',
         name: 'Sanjay Gupta',
         email: 'supplier-b@test.com',
-        password: 'demo123',
-        companyName: 'ValueCraft Office Solutions',
+        password_hash: defaultHashedPassword,
+        company_name: 'ValueCraft Office Solutions',
         role: 'SUPPLIER',
         department: 'Institutional Contracts',
         phone: '+91 98210 98765',
-        avatarInitials: 'SG',
-        supplierId: 'supp_valuecraft',
-        createdAt: '2026-02-05T09:00:00Z'
+        avatar_initials: 'SG',
+        supplier_id: 'supp_valuecraft',
+        created_at: '2026-02-05T09:00:00Z'
       },
       {
         id: 'usr_supplier_c',
         name: 'Deepak Chawla',
         email: 'supplier-c@test.com',
-        password: 'demo123',
-        companyName: 'Zenith Luxury Seating Inc',
+        password_hash: defaultHashedPassword,
+        company_name: 'Zenith Luxury Seating Inc',
         role: 'SUPPLIER',
         department: 'Enterprise Sales',
         phone: '+91 99100 45678',
-        avatarInitials: 'DC',
-        supplierId: 'supp_zenith',
-        createdAt: '2026-02-10T09:00:00Z'
+        avatar_initials: 'DC',
+        supplier_id: 'supp_zenith',
+        created_at: '2026-02-10T09:00:00Z'
       }
     ];
 
-    this.inventory = [
+    for (const u of seedUsers) {
+      insertUser.run(
+        u.id,
+        u.name,
+        u.email,
+        u.password_hash,
+        u.company_name,
+        u.role,
+        u.department,
+        u.phone,
+        u.avatar_initials,
+        u.supplier_id,
+        u.created_at
+      );
+    }
+
+    // 2. Inventory
+    const insertInv = this.sqlite.prepare(`
+      INSERT INTO inventory (id, sku, name, category, current_quantity, reserved_quantity, available_quantity, reorder_threshold, warehouse_location, condition, unit_cost, monthly_consumption, estimated_days_remaining, last_updated)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const seedInventory: InventoryItem[] = [
       {
         id: 'inv_chairs_01',
         sku: 'FURN-CHR-001',
@@ -142,7 +362,32 @@ export class ProcurementDatabase {
       }
     ];
 
-    this.suppliers = [
+    for (const inv of seedInventory) {
+      insertInv.run(
+        inv.id,
+        inv.sku,
+        inv.name,
+        inv.category,
+        inv.currentQuantity,
+        inv.reservedQuantity,
+        inv.availableQuantity,
+        inv.reorderThreshold,
+        inv.warehouseLocation,
+        inv.condition,
+        inv.unitCost,
+        inv.monthlyConsumption,
+        inv.estimatedDaysRemaining,
+        inv.lastUpdated
+      );
+    }
+
+    // 3. Suppliers
+    const insertSupp = this.sqlite.prepare(`
+      INSERT INTO suppliers (id, code, name, contact_person, email, phone, address, categories, payment_terms, gst_number, status, performance)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const seedSuppliers: Supplier[] = [
       {
         id: 'supp_apex',
         code: 'SUPP-001',
@@ -220,7 +465,30 @@ export class ProcurementDatabase {
       }
     ];
 
-    this.history = [
+    for (const s of seedSuppliers) {
+      insertSupp.run(
+        s.id,
+        s.code,
+        s.name,
+        s.contactPerson ?? null,
+        s.email,
+        s.phone ?? null,
+        s.address ?? null,
+        JSON.stringify(s.categories),
+        s.paymentTerms,
+        s.gstNumber ?? null,
+        s.status,
+        JSON.stringify(s.performance)
+      );
+    }
+
+    // 4. Historical Purchases
+    const insertHist = this.sqlite.prepare(`
+      INSERT INTO historical_purchases (id, item_code, item_name, supplier_id, supplier_name, quantity, unit_price, total_price, purchase_date, on_time_delivery, quality_rating, warranty_issues_reported, payment_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const seedHistory: HistoricalPurchase[] = [
       {
         id: 'hist_01',
         itemCode: 'FURN-CHR-001',
@@ -268,7 +536,25 @@ export class ProcurementDatabase {
       }
     ];
 
-    // Seed Demo Request PR-2026-00001
+    for (const h of seedHistory) {
+      insertHist.run(
+        h.id,
+        h.itemCode,
+        h.itemName,
+        h.supplierId,
+        h.supplierName,
+        h.quantity,
+        h.unitPrice,
+        h.totalPrice,
+        h.purchaseDate,
+        h.onTimeDelivery ? 1 : 0,
+        h.qualityRating,
+        h.warrantyIssuesReported,
+        h.paymentMethod
+      );
+    }
+
+    // 5. Seed Demo PR (PR-2026-00001)
     const demoPR: ProcurementRequest = {
       id: 'pr_demo_124',
       code: 'PR-2026-00001',
@@ -629,176 +915,512 @@ export class ProcurementDatabase {
       ]
     };
 
-    this.requests.set(demoPR.id, demoPR);
+    this.saveRequest(demoPR);
 
     // Initial Notifications
-    this.notifications = [
-      {
-        id: 'notif_01',
-        role: 'COMPANY_USER',
-        title: 'AI Recommendation Ready',
-        message: 'PR-2026-00001: Recommendation generated for 65 chairs from Apex Ergonomics.',
-        type: 'SUCCESS',
-        read: false,
-        createdAt: '2026-10-30T10:37:05Z',
-        link: '/company/procurement/pr_demo_124'
-      },
-      {
-        id: 'notif_02',
-        role: 'FINANCE_APPROVER',
-        title: 'Procurement Awaiting Approval',
-        message: 'PR-2026-00001 (₹1,78,490) is ready for finance review and PayPal authorization.',
-        type: 'WARNING',
-        read: false,
-        createdAt: '2026-10-30T10:37:10Z',
-        link: '/finance/approvals/pr_demo_124'
-      },
-      {
-        id: 'notif_03',
-        role: 'SUPPLIER',
-        title: 'RFQ Assigned',
-        message: 'You have been recommended for PR-2026-00001. Awaiting buyer treasury clearance.',
-        type: 'INFO',
-        read: false,
-        createdAt: '2026-10-30T10:37:15Z',
-        link: '/supplier/procurements/pr_demo_124'
-      }
-    ];
+    this.addNotification({
+      role: 'COMPANY_USER',
+      title: 'AI Recommendation Ready',
+      message: 'PR-2026-00001: Recommendation generated for 65 chairs from Apex Ergonomics.',
+      type: 'SUCCESS',
+      link: '/company/procurement/pr_demo_124'
+    });
 
-    // Seed global audit logs from demo PR
-    this.globalAuditLogs = [...demoPR.auditTrail];
+    this.addNotification({
+      role: 'FINANCE_APPROVER',
+      title: 'Procurement Awaiting Approval',
+      message: 'PR-2026-00001 (₹1,78,490) is ready for finance review and PayPal authorization.',
+      type: 'WARNING',
+      link: '/finance/approvals/pr_demo_124'
+    });
+
+    this.addNotification({
+      role: 'SUPPLIER',
+      title: 'Commercial Tender Opportunity',
+      message: 'PR-2026-00001: Commercial quotation invited for 65 Ergonomic Office Chairs.',
+      type: 'INFO',
+      link: '/supplier/dashboard'
+    });
+
+    // Global audit trail
+    for (const log of demoPR.auditTrail) {
+      this.insertAuditLogEntry(log);
+    }
   }
 
-  // --- User & Auth ---
-  public getUserByEmail(email: string): User | undefined {
-    return this.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  // --- Users & Auth ---
+  public getUserByEmail(email: string): (User & { passwordHash?: string }) | undefined {
+    const row = this.sqlite.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').get(email) as any;
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      passwordHash: row.password_hash,
+      companyName: row.company_name,
+      role: row.role as any,
+      department: row.department,
+      phone: row.phone,
+      avatarInitials: row.avatar_initials,
+      supplierId: row.supplier_id,
+      createdAt: row.created_at
+    };
   }
 
   public getUserById(id: string): User | undefined {
-    return this.users.find(u => u.id === id);
+    const row = this.sqlite.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      companyName: row.company_name,
+      role: row.role as any,
+      department: row.department,
+      phone: row.phone,
+      avatarInitials: row.avatar_initials,
+      supplierId: row.supplier_id,
+      createdAt: row.created_at
+    };
   }
 
-  public createUser(userData: Partial<User>): User {
-    const newUser: User = {
-      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      name: userData.name || 'New User',
-      email: userData.email || '',
-      password: userData.password || 'demo123',
-      companyName: userData.companyName || 'Acme Corp',
-      role: userData.role || 'COMPANY_USER',
-      department: userData.department || 'Operations',
-      phone: userData.phone || '+91 99000 00000',
-      avatarInitials: (userData.name || 'NU').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
-      createdAt: new Date().toISOString(),
-      supplierId: userData.supplierId
+  public getUsers(): User[] {
+    const rows = this.sqlite.prepare('SELECT * FROM users ORDER BY created_at ASC').all() as any[];
+    return rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      companyName: row.company_name,
+      role: row.role as any,
+      department: row.department,
+      phone: row.phone,
+      avatarInitials: row.avatar_initials,
+      supplierId: row.supplier_id,
+      createdAt: row.created_at
+    }));
+  }
+
+  public createUser(userData: {
+    name: string;
+    companyName: string;
+    email: string;
+    password?: string;
+    role: any;
+    supplierId?: string;
+  }): User {
+    const id = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const initials = userData.name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) || 'PP';
+
+    const hashedPassword = bcrypt.hashSync(userData.password || 'demo123', 10);
+    const createdAt = new Date().toISOString();
+
+    this.sqlite.prepare(`
+      INSERT INTO users (id, name, email, password_hash, company_name, role, department, phone, avatar_initials, supplier_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      userData.name,
+      userData.email,
+      hashedPassword,
+      userData.companyName,
+      userData.role,
+      userData.role === 'SUPPLIER' ? 'Vendor Commercials' : 'Procurement Dept',
+      '+91 98000 00000',
+      initials,
+      userData.supplierId || null,
+      createdAt
+    );
+
+    return {
+      id,
+      name: userData.name,
+      email: userData.email,
+      companyName: userData.companyName,
+      role: userData.role,
+      department: userData.role === 'SUPPLIER' ? 'Vendor Commercials' : 'Procurement Dept',
+      phone: '+91 98000 00000',
+      avatarInitials: initials,
+      supplierId: userData.supplierId,
+      createdAt
     };
-    this.users.push(newUser);
-    return newUser;
   }
 
   public setResetToken(email: string): string {
-    const token = `reset_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    this.resetTokens.set(token, email.toLowerCase());
+    const token = `rst_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const now = Date.now();
+    const expiresAt = now + 3600 * 1000; // 1 hour validity
+
+    this.sqlite.prepare(`
+      INSERT OR REPLACE INTO reset_tokens (token, email, created_at, expires_at)
+      VALUES (?, ?, ?, ?)
+    `).run(token, email, now, expiresAt);
+
     return token;
   }
 
   public resetPasswordWithToken(token: string, newPassword: string): boolean {
-    const email = this.resetTokens.get(token);
-    if (!email) return false;
-    const user = this.getUserByEmail(email);
-    if (!user) return false;
-    user.password = newPassword;
-    this.resetTokens.delete(token);
+    const row = this.sqlite.prepare('SELECT * FROM reset_tokens WHERE token = ?').get(token) as any;
+    if (!row) return false;
+    if (Date.now() > row.expires_at) {
+      this.sqlite.prepare('DELETE FROM reset_tokens WHERE token = ?').run(token);
+      return false;
+    }
+
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    this.sqlite.prepare('UPDATE users SET password_hash = ? WHERE LOWER(email) = LOWER(?)').run(hashedPassword, row.email);
+    this.sqlite.prepare('DELETE FROM reset_tokens WHERE token = ?').run(token);
     return true;
   }
 
-  // --- Requests ---
+  // --- Procurement Requests ---
   public getAllRequests(): ProcurementRequest[] {
-    return Array.from(this.requests.values()).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    const rows = this.sqlite.prepare('SELECT data_json FROM procurement_requests ORDER BY created_at DESC').all() as any[];
+    return rows.map(r => JSON.parse(r.data_json));
   }
 
   public getRequestById(id: string): ProcurementRequest | undefined {
-    return this.requests.get(id);
+    const row = this.sqlite.prepare('SELECT data_json FROM procurement_requests WHERE id = ?').get(id) as any;
+    if (!row) return undefined;
+    return JSON.parse(row.data_json);
   }
 
   public saveRequest(request: ProcurementRequest): ProcurementRequest {
-    request.updatedAt = new Date().toISOString();
-    this.requests.set(request.id, request);
+    const stmt = this.sqlite.prepare(`
+      INSERT OR REPLACE INTO procurement_requests (
+        id, code, title, product_service, description, category,
+        requested_quantity, unit, max_budget, currency, cost_center,
+        delivery_required_days, delivery_deadline_date, department,
+        business_justification, expected_benefit, priority, policy_constraints,
+        created_by, creator_email, created_at, updated_at, status, data_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    (stmt as any).run(
+      request.id,
+      request.code,
+      request.title,
+      request.productService,
+      request.description,
+      request.category,
+      request.requestedQuantity,
+      request.unit,
+      request.maxBudget,
+      request.currency,
+      request.costCenter || null,
+      request.deliveryRequiredDays,
+      request.deliveryDeadlineDate,
+      request.department,
+      request.businessJustification || null,
+      request.expectedBenefit || null,
+      request.priority,
+      request.policyConstraints || null,
+      request.createdBy,
+      request.creatorEmail,
+      request.createdAt,
+      request.updatedAt,
+      request.status,
+      JSON.stringify(request)
+    );
+
     return request;
   }
 
-  // --- Inventory & Suppliers ---
-  public getInventory(): InventoryItem[] {
-    return this.inventory;
+  public deleteRequest(id: string): boolean {
+    const res = this.sqlite.prepare('DELETE FROM procurement_requests WHERE id = ?').run(id);
+    return res.changes > 0;
   }
 
-  public updateInventoryItem(id: string, updates: Partial<InventoryItem>): InventoryItem | undefined {
-    const item = this.inventory.find(i => i.id === id);
-    if (item) {
-      Object.assign(item, updates, { lastUpdated: new Date().toISOString().split('T')[0] });
-    }
-    return item;
+  // --- Inventory ---
+  public getInventory(): InventoryItem[] {
+    const rows = this.sqlite.prepare('SELECT * FROM inventory ORDER BY name ASC').all() as any[];
+    return rows.map(r => ({
+      id: r.id,
+      sku: r.sku,
+      name: r.name,
+      category: r.category,
+      currentQuantity: r.current_quantity,
+      reservedQuantity: r.reserved_quantity,
+      availableQuantity: r.available_quantity,
+      reorderThreshold: r.reorder_threshold,
+      warehouseLocation: r.warehouse_location,
+      condition: r.condition,
+      unitCost: r.unit_cost,
+      monthlyConsumption: r.monthly_consumption,
+      estimatedDaysRemaining: r.estimated_days_remaining,
+      lastUpdated: r.last_updated
+    }));
   }
 
   public addInventoryItem(item: InventoryItem): InventoryItem {
-    this.inventory.push(item);
+    this.sqlite.prepare(`
+      INSERT INTO inventory (id, sku, name, category, current_quantity, reserved_quantity, available_quantity, reorder_threshold, warehouse_location, condition, unit_cost, monthly_consumption, estimated_days_remaining, last_updated)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      item.id,
+      item.sku,
+      item.name,
+      item.category,
+      item.currentQuantity,
+      item.reservedQuantity,
+      item.availableQuantity,
+      item.reorderThreshold,
+      item.warehouseLocation,
+      item.condition,
+      item.unitCost,
+      item.monthlyConsumption,
+      item.estimatedDaysRemaining,
+      item.lastUpdated
+    );
     return item;
   }
 
+  public updateInventoryItem(id: string, updates: Partial<InventoryItem>): InventoryItem | null {
+    const existing = this.sqlite.prepare('SELECT * FROM inventory WHERE id = ?').get(id) as any;
+    if (!existing) return null;
+
+    const currentQty = updates.currentQuantity !== undefined ? updates.currentQuantity : existing.current_quantity;
+    const reservedQty = updates.reservedQuantity !== undefined ? updates.reservedQuantity : existing.reserved_quantity;
+    const availableQty = currentQty - reservedQty;
+
+    this.sqlite.prepare(`
+      UPDATE inventory SET
+        name = COALESCE(?, name),
+        category = COALESCE(?, category),
+        current_quantity = ?,
+        reserved_quantity = ?,
+        available_quantity = ?,
+        reorder_threshold = COALESCE(?, reorder_threshold),
+        warehouse_location = COALESCE(?, warehouse_location),
+        unit_cost = COALESCE(?, unit_cost),
+        last_updated = ?
+      WHERE id = ?
+    `).run(
+      updates.name || null,
+      updates.category || null,
+      currentQty,
+      reservedQty,
+      availableQty,
+      updates.reorderThreshold || null,
+      updates.warehouseLocation || null,
+      updates.unitCost || null,
+      new Date().toISOString().split('T')[0],
+      id
+    );
+
+    return this.getInventory().find(i => i.id === id) || null;
+  }
+
+  // --- Suppliers ---
   public getSuppliers(): Supplier[] {
-    return this.suppliers;
+    const rows = this.sqlite.prepare('SELECT * FROM suppliers ORDER BY name ASC').all() as any[];
+    return rows.map(r => ({
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      contactPerson: r.contact_person,
+      email: r.email,
+      phone: r.phone,
+      address: r.address,
+      categories: JSON.parse(r.categories || '[]'),
+      paymentTerms: r.payment_terms,
+      gstNumber: r.gst_number,
+      status: r.status as any,
+      performance: JSON.parse(r.performance || '{}')
+    }));
   }
 
   public getSupplierById(id: string): Supplier | undefined {
-    return this.suppliers.find(s => s.id === id);
+    const r = this.sqlite.prepare('SELECT * FROM suppliers WHERE id = ?').get(id) as any;
+    if (!r) return undefined;
+    return {
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      contactPerson: r.contact_person,
+      email: r.email,
+      phone: r.phone,
+      address: r.address,
+      categories: JSON.parse(r.categories || '[]'),
+      paymentTerms: r.payment_terms,
+      gstNumber: r.gst_number,
+      status: r.status as any,
+      performance: JSON.parse(r.performance || '{}')
+    };
+  }
+
+  public addSupplier(supplier: Supplier): Supplier {
+    this.sqlite.prepare(`
+      INSERT INTO suppliers (id, code, name, contact_person, email, phone, address, categories, payment_terms, gst_number, status, performance)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      supplier.id,
+      supplier.code,
+      supplier.name,
+      supplier.contactPerson || '',
+      supplier.email,
+      supplier.phone || '',
+      supplier.address || '',
+      JSON.stringify(supplier.categories || []),
+      supplier.paymentTerms || 'Net 30',
+      supplier.gstNumber || null,
+      supplier.status || 'ACTIVE',
+      JSON.stringify(supplier.performance || {
+        overallRating: 92,
+        deliveryScore: 90,
+        qualityScore: 92,
+        onTimeDeliveryRate: 98,
+        defectRate: 1,
+        averageLeadTimeDays: 8,
+        totalOrdersCompleted: 0,
+        totalSpend: 0,
+        riskLevel: 'LOW',
+        preferredStatus: true
+      })
+    );
+    return supplier;
   }
 
   public getHistoricalPurchases(): HistoricalPurchase[] {
-    return this.history;
-  }
-
-  public getUsers(): User[] {
-    return this.users;
+    const rows = this.sqlite.prepare('SELECT * FROM historical_purchases ORDER BY purchase_date DESC').all() as any[];
+    return rows.map(r => ({
+      id: r.id,
+      itemCode: r.item_code,
+      itemName: r.item_name,
+      supplierId: r.supplier_id,
+      supplierName: r.supplier_name,
+      quantity: r.quantity,
+      unitPrice: r.unit_price,
+      totalPrice: r.total_price,
+      purchaseDate: r.purchase_date,
+      onTimeDelivery: Boolean(r.on_time_delivery),
+      qualityRating: r.quality_rating,
+      warrantyIssuesReported: r.warranty_issues_reported,
+      paymentMethod: r.payment_method
+    }));
   }
 
   // --- Payments ---
   public getAllPayments(): PayPalPaymentRecord[] {
-    return this.payments;
+    const rows = this.sqlite.prepare('SELECT data_json FROM payments ORDER BY captured_at DESC').all() as any[];
+    return rows.map(r => JSON.parse(r.data_json));
+  }
+
+  public getPaymentById(id: string): PayPalPaymentRecord | undefined {
+    const row = this.sqlite.prepare('SELECT data_json FROM payments WHERE id = ? OR order_id = ?').get(id, id) as any;
+    if (!row) return undefined;
+    return JSON.parse(row.data_json);
   }
 
   public addPayment(payment: PayPalPaymentRecord): PayPalPaymentRecord {
-    this.payments.unshift(payment);
+    this.sqlite.prepare(`
+      INSERT OR REPLACE INTO payments (
+        id, order_id, capture_id, procurement_id, procurement_code,
+        status, supplier_id, supplier_name, supplier_paypal_account,
+        amount, currency, authorized_by, authorized_at, captured_at,
+        validation_check_passed, data_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      payment.id,
+      payment.orderId,
+      payment.captureId ?? null,
+      payment.procurementId,
+      payment.procurementCode,
+      payment.status,
+      payment.supplierId,
+      payment.supplierName,
+      payment.supplierPayPalAccount,
+      payment.amount,
+      payment.currency,
+      payment.authorizedBy,
+      payment.authorizedAt,
+      payment.capturedAt ?? null,
+      payment.validationCheckPassed ? 1 : 0,
+      JSON.stringify(payment)
+    );
     return payment;
   }
 
   // --- Notifications ---
   public getNotifications(role?: string): AppNotification[] {
-    if (!role) return this.notifications;
-    return this.notifications.filter(n => n.role === role || n.role === 'ALL');
+    let rows: any[];
+    if (role && role !== 'ALL') {
+      rows = this.sqlite.prepare("SELECT * FROM notifications WHERE role = ? OR role = 'ALL' ORDER BY created_at DESC").all(role) as any[];
+    } else {
+      rows = this.sqlite.prepare('SELECT * FROM notifications ORDER BY created_at DESC').all() as any[];
+    }
+
+    return rows.map(r => ({
+      id: r.id,
+      role: r.role,
+      title: r.title,
+      message: r.message,
+      type: r.type,
+      link: r.link,
+      read: Boolean(r.read),
+      createdAt: r.created_at
+    }));
   }
 
   public addNotification(notif: Omit<AppNotification, 'id' | 'createdAt' | 'read'>): AppNotification {
-    const newNotif: AppNotification = {
+    const id = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const createdAt = new Date().toISOString();
+
+    this.sqlite.prepare(`
+      INSERT INTO notifications (id, role, title, message, type, link, read, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+    `).run(
+      id,
+      notif.role,
+      notif.title,
+      notif.message,
+      notif.type,
+      notif.link || null,
+      createdAt
+    );
+
+    return {
+      id,
       ...notif,
-      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      createdAt: new Date().toISOString(),
-      read: false
+      read: false,
+      createdAt
     };
-    this.notifications.unshift(newNotif);
-    return newNotif;
   }
 
   public markNotificationAsRead(id: string): void {
-    const notif = this.notifications.find(n => n.id === id);
-    if (notif) notif.read = true;
+    this.sqlite.prepare('UPDATE notifications SET read = 1 WHERE id = ?').run(id);
   }
 
   // --- Audit Logs ---
   public getAllAuditLogs(): AuditLogEntry[] {
-    return this.globalAuditLogs.sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    const rows = this.sqlite.prepare('SELECT * FROM audit_logs ORDER BY timestamp DESC').all() as any[];
+    return rows.map(r => ({
+      id: r.id,
+      timestamp: r.timestamp,
+      actor: r.actor,
+      actorRole: r.actor_role,
+      action: r.action,
+      details: r.details,
+      procurementId: r.procurement_id
+    }));
+  }
+
+  private insertAuditLogEntry(entry: AuditLogEntry): void {
+    this.sqlite.prepare(`
+      INSERT OR REPLACE INTO audit_logs (id, timestamp, actor, actor_role, action, details, procurement_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      entry.id,
+      entry.timestamp,
+      entry.actor,
+      entry.actorRole,
+      entry.action,
+      entry.details,
+      entry.procurementId ?? ''
     );
   }
 
@@ -819,23 +1441,69 @@ export class ProcurementDatabase {
       procurementId: requestId
     };
 
-    this.globalAuditLogs.unshift(entry);
+    this.insertAuditLogEntry(entry);
 
-    const pr = this.requests.get(requestId);
+    const pr = this.getRequestById(requestId);
     if (pr) {
-      pr.auditTrail.push(entry);
+      pr.auditTrail = pr.auditTrail || [];
+      pr.auditTrail.unshift(entry);
       pr.updatedAt = entry.timestamp;
+      this.saveRequest(pr);
     }
+  }
+
+  public savePayPalOrderRecord(order: {
+    id: string;
+    paypalOrderId: string;
+    procurementId: string;
+    supplierId: string;
+    supplierName: string;
+    amount: number;
+    currency: string;
+    convertedAmount?: number;
+    convertedCurrency?: string;
+    status: string;
+    approvalUrl?: string;
+    createdAt: string;
+    updatedAt: string;
+  }): void {
+    this.sqlite.prepare(`
+      INSERT OR REPLACE INTO paypal_orders (
+        id, paypal_order_id, procurement_id, supplier_id, supplier_name,
+        amount, currency, converted_amount, converted_currency, status,
+        approval_url, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      order.id,
+      order.paypalOrderId,
+      order.procurementId,
+      order.supplierId,
+      order.supplierName,
+      order.amount,
+      order.currency,
+      order.convertedAmount ?? null,
+      order.convertedCurrency ?? null,
+      order.status,
+      order.approvalUrl ?? null,
+      order.createdAt,
+      order.updatedAt
+    );
+  }
+
+  public updatePayPalOrderStatus(paypalOrderId: string, status: string): void {
+    this.sqlite.prepare(`
+      UPDATE paypal_orders SET status = ?, updated_at = ? WHERE paypal_order_id = ?
+    `).run(status, new Date().toISOString(), paypalOrderId);
+  }
+
+  public getPayPalOrderByOrderId(paypalOrderId: string): any {
+    return this.sqlite.prepare('SELECT * FROM paypal_orders WHERE paypal_order_id = ?').get(paypalOrderId);
   }
 
   // Reset to default Demo
   public resetToDemo(): ProcurementRequest {
-    this.requests.clear();
-    this.payments = [];
-    this.notifications = [];
-    this.globalAuditLogs = [];
     this.seedInitialData();
-    return this.requests.get('pr_demo_124')!;
+    return this.getRequestById('pr_demo_124')!;
   }
 }
 

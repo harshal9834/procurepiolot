@@ -2,15 +2,22 @@ export type UserRole = 'COMPANY_USER' | 'FINANCE_APPROVER' | 'SUPPLIER';
 
 export type ProcurementStatus =
   | 'DRAFT'
+  | 'REQUEST_SENT'
+  | 'QUOTES_RECEIVING'
+  | 'AI_ANALYZING'
+  | 'AI_RECOMMENDED'
+  | 'AWAITING_REQUESTER_APPROVAL'
+  | 'AWAITING_FINANCE'
+  | 'PAYMENT_PENDING'
+  | 'PAID'
+  | 'REJECTED'
+  | 'PAYMENT_FAILED'
+  | 'CANCELLED'
   | 'ANALYZING'
   | 'QUOTES_PENDING'
   | 'ANALYZED'
-  | 'AI_RECOMMENDED'
   | 'PENDING_APPROVAL'
   | 'APPROVED'
-  | 'REJECTED'
-  | 'PAYMENT_PENDING'
-  | 'PAID'
   | 'COMPLETED';
 
 export type QuotationStatus =
@@ -44,6 +51,7 @@ export interface User {
   name: string;
   email: string;
   password?: string;
+  passwordHash?: string;
   companyName: string;
   role: UserRole;
   department?: string;
@@ -108,6 +116,9 @@ export interface Supplier {
   phone: string;
   address: string;
   categories: string[];
+  productsSupplied?: string[];
+  description?: string;
+  website?: string;
   performance: SupplierPerformance;
   paymentTerms: string;
   gstNumber?: string;
@@ -266,8 +277,18 @@ export interface ProcurementRequest {
   createdBy: string;
   creatorEmail: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   status: ProcurementStatus;
+
+  // Simple Workflow & Targeting
+  targetSupplierMode?: 'ALL_RELEVANT' | 'SPECIFIC';
+  assignedSupplierIds?: string[];
+  selectedSupplierId?: string;
+  selectedQuoteId?: string;
+  requesterApprovedAt?: string;
+  requesterApprovedBy?: string;
+  financeApprovedAt?: string;
+  financeApprovedBy?: string;
 
   // Attached sub-data
   aiUnderstanding?: AiUnderstanding;

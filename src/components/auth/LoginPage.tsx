@@ -6,6 +6,7 @@ interface LoginPageProps {
   onLogin: (credentials: { email: string; password: string }) => Promise<void>;
   onNavigateRegister: () => void;
   onNavigateForgotPassword: () => void;
+  onNavigateSupplierRegister?: () => void;
   isLoading: boolean;
   errorMessage?: string;
 }
@@ -14,6 +15,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onLogin,
   onNavigateRegister,
   onNavigateForgotPassword,
+  onNavigateSupplierRegister,
   isLoading,
   errorMessage
 }) => {
@@ -172,14 +174,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </div>
           </div>
 
-          <div className="mt-6 text-center text-xs text-slate-500">
-            Don't have an enterprise account?{' '}
-            <button
-              onClick={onNavigateRegister}
-              className="text-indigo-600 font-bold hover:underline"
-            >
-              Register your business
-            </button>
+          <div className="mt-6 text-center text-xs text-slate-500 space-y-1.5">
+            <div>
+              Don't have an enterprise account?{' '}
+              <button
+                type="button"
+                onClick={onNavigateRegister}
+                className="text-indigo-600 font-bold hover:underline"
+              >
+                Register your business
+              </button>
+            </div>
+            {onNavigateSupplierRegister && (
+              <div className="pt-2 border-t border-slate-100">
+                Are you a vendor?{' '}
+                <button
+                  type="button"
+                  id="link-supplier-register"
+                  onClick={onNavigateSupplierRegister}
+                  className="text-amber-600 font-bold hover:underline"
+                >
+                  Register as a Supplier
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

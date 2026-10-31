@@ -29,29 +29,24 @@ export const TopNav: React.FC<TopNavProps> = ({
   currentRoute
 }) => {
   const getBreadcrumbTitle = () => {
-    if (currentRoute === '/company/dashboard') return 'Company Procurement Overview';
-    if (currentRoute === '/company/procurement/new') return 'New Procurement Request';
-    if (currentRoute.startsWith('/company/procurement/')) return 'Procurement Decision Console';
-    if (currentRoute === '/company/procurement') return 'Procurement Orders';
-    if (currentRoute === '/company/inventory') return 'Warehouse Inventory Depots';
-    if (currentRoute === '/company/suppliers') return 'Vendor Directory & Performance';
-    if (currentRoute === '/company/quotes') return 'Supplier Quotations Hub';
-    if (currentRoute === '/company/analytics') return 'Corporate Spend Analytics';
+    if (currentRoute === '/requester/dashboard' || currentRoute === '/company/dashboard') return 'Requester Dashboard';
+    if (currentRoute === '/requester/request/new' || currentRoute === '/company/procurement/new') return 'Create Procurement Request';
+    if (currentRoute.startsWith('/requester/requests/') || currentRoute.startsWith('/company/procurement/')) return 'AI Comparison & Approval';
+    if (currentRoute === '/requester/requests' || currentRoute === '/company/procurement') return 'My Procurement Requests';
 
-    if (currentRoute === '/finance/dashboard') return 'Treasury & Approvals Console';
-    if (currentRoute.startsWith('/finance/approvals')) return 'Finance Approval Gate';
-    if (currentRoute.startsWith('/finance/payments')) return 'PayPal Sandbox Settlements';
-    if (currentRoute === '/finance/reports') return 'Treasury Spend Reports';
-    if (currentRoute === '/finance/audit') return 'Cryptographic Audit Trail';
+    if (currentRoute === '/finance/dashboard') return 'Finance Payment Dashboard';
+    if (currentRoute === '/finance/pending') return 'Pending Disbursements';
+    if (currentRoute.startsWith('/finance/approvals')) return 'Payment Review & Authorization';
+    if (currentRoute.startsWith('/finance/payments')) return 'Settled PayPal Transactions';
 
-    if (currentRoute === '/supplier/dashboard') return 'Vendor Collaboration Dashboard';
-    if (currentRoute.startsWith('/supplier/procurements')) return 'Assigned RFQs & Quotations';
+    if (currentRoute === '/supplier/dashboard') return 'Supplier Portal Dashboard';
+    if (currentRoute === '/supplier/requests') return 'Open RFQs & Tenders';
+    if (currentRoute.startsWith('/supplier/quote/') || currentRoute.startsWith('/supplier/procurements/')) return 'Submit Quotation';
+    if (currentRoute === '/supplier/quotes') return 'My Submitted Quotes';
     if (currentRoute === '/supplier/orders') return 'Purchase Orders';
-    if (currentRoute === '/supplier/payments') return 'Settled Transactions';
+    if (currentRoute === '/supplier/payments') return 'Settled Payments';
 
-    if (currentRoute === '/notifications') return 'Notification Alerts';
     if (currentRoute === '/profile') return 'User Profile';
-    if (currentRoute === '/settings') return 'System & Account Settings';
 
     return 'ProcurePilot AI';
   };

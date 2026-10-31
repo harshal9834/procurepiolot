@@ -3,19 +3,15 @@ import { Sidebar } from './components/layout/Sidebar';
 import { TopNav } from './components/layout/TopNav';
 import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
+import { SupplierRegisterPage } from './components/auth/SupplierRegisterPage';
 import { ForgotPasswordPage } from './components/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
-import { CompanyDashboard } from './components/company/CompanyDashboard';
-import { CreateProcurementPage } from './components/company/CreateProcurementPage';
-import { SupplierComparisonPage } from './components/company/SupplierComparisonPage';
-import { CompanyAnalyticsPage } from './components/company/CompanyAnalyticsPage';
-import { ProcurementDetailView } from './components/ProcurementDetailView';
-import { InventoryView } from './components/InventoryView';
+import { RequesterDashboard } from './components/requester/RequesterDashboard';
+import { CreateRequestPage } from './components/requester/CreateRequestPage';
+import { RequesterRequestDetail } from './components/requester/RequesterRequestDetail';
 import { FinanceDashboard } from './components/finance/FinanceDashboard';
 import { FinanceApprovalPage } from './components/finance/FinanceApprovalPage';
 import { FinancePaymentsPage } from './components/finance/FinancePaymentsPage';
-import { FinanceReportsPage } from './components/finance/FinanceReportsPage';
-import { FinanceAuditPage } from './components/finance/FinanceAuditPage';
 import { SupplierDashboard } from './components/supplier/SupplierDashboard';
 import { SupplierQuotationPage } from './components/supplier/SupplierQuotationPage';
 import { NotificationsDrawer } from './components/common/NotificationsDrawer';
@@ -36,23 +32,13 @@ import { AlertCircle, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export default function App() {
   // Auth State
-  const [currentUser, setCurrentUser] = useState<User | null>({
-    id: 'usr_company_1',
-    name: 'Rajesh Sharma',
-    email: 'procurement@acme.test',
-    companyName: 'Acme Technologies Pvt Ltd',
-    role: 'COMPANY_USER',
-    department: 'Workplace & Facilities',
-    phone: '+91 98450 11223',
-    avatarInitials: 'RS',
-    createdAt: '2026-01-15T09:00:00Z'
-  });
-  const [authView, setAuthView] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authView, setAuthView] = useState<'login' | 'register' | 'supplier-register' | 'forgot' | 'reset'>('login');
   const [resetToken, setResetToken] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
 
   // Routing State
-  const [currentRoute, setCurrentRoute] = useState<string>('/company/dashboard');
+  const [currentRoute, setCurrentRoute] = useState<string>('/requester/dashboard');
   const [selectedRequestId, setSelectedRequestId] = useState<string>('pr_demo_124');
 
   // Core Data
@@ -103,6 +89,47 @@ export default function App() {
     }
   };
 
+  // Restore authenticated session on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      const path = window.location.pathname;
+      if (path === '/supplier/register') {
+        setAuthView('supplier-register');
+        return;
+      }
+
+      const token = api.getToken();
+      if (token) {
+        try {
+          const user = await api.getMe();
+          setCurrentUser(user);
+          if (path && path !== '/' && path !== '/login') {
+            setCurrentRoute(path);
+          } else if (user.role === 'FINANCE_APPROVER') {
+            setCurrentRoute('/finance/dashboard');
+          } else if (user.role === 'SUPPLIER') {
+            setCurrentRoute('/supplier/dashboard');
+          } else {
+            setCurrentRoute('/requester/dashboard');
+          }
+        } catch {
+          api.clearToken();
+          setCurrentUser(null);
+        }
+      } else {
+        // Automatically sign in with default company requester demo user for immediate evaluation
+        try {
+          const user = await api.login({ email: 'procurement@acme.test', password: 'demo123' });
+          setCurrentUser(user);
+          setCurrentRoute('/requester/dashboard');
+        } catch {
+          setCurrentUser(null);
+        }
+      }
+    };
+    initAuth();
+  }, []);
+
   useEffect(() => {
     if (currentUser) {
       loadAllData();
@@ -117,13 +144,13 @@ export default function App() {
       const user = await api.login(credentials);
       setCurrentUser(user);
 
-      // Route by role matching Section 3
+      // Route by role
       if (user.role === 'FINANCE_APPROVER') {
         setCurrentRoute('/finance/dashboard');
       } else if (user.role === 'SUPPLIER') {
         setCurrentRoute('/supplier/dashboard');
       } else {
-        setCurrentRoute('/company/dashboard');
+        setCurrentRoute('/requester/dashboard');
       }
 
       showToast(`Welcome back, ${user.name}`);
@@ -140,7 +167,7 @@ export default function App() {
     try {
       const newUser = await api.register(data);
       setCurrentUser(newUser);
-      setCurrentRoute(newUser.role === 'SUPPLIER' ? '/supplier/dashboard' : '/company/dashboard');
+      setCurrentRoute(newUser.role === 'SUPPLIER' ? '/supplier/dashboard' : '/requester/dashboard');
       showToast(`Account registered successfully for ${newUser.companyName}`);
     } catch (err: any) {
       setAuthError(err.message || 'Registration failed');
@@ -150,34 +177,39 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    api.clearToken();
     setCurrentUser(null);
     setAuthView('login');
     showToast('Logged out of session');
   };
 
-  const handleRoleSwitch = (newRole: UserRole) => {
-    if (!currentUser) return;
-    const updated = {
-      ...currentUser,
-      role: newRole,
-      name:
-        newRole === 'FINANCE_APPROVER'
-          ? 'Ananya Roy (Head of Treasury)'
-          : newRole === 'SUPPLIER'
-          ? 'Vikram Mehta (Apex Ergonomics)'
-          : 'Rajesh Sharma (Procurement Lead)'
-    };
-    setCurrentUser(updated);
+  const handleRoleSwitch = async (newRole: UserRole) => {
+    setIsActionLoading(true);
+    try {
+      const demoAccounts: Record<UserRole, string> = {
+        COMPANY_USER: 'procurement@acme.test',
+        FINANCE_APPROVER: 'finance@acme.test',
+        SUPPLIER: 'supplier-a@test.com'
+      };
+      const email = demoAccounts[newRole];
+      const user = await api.login({ email, password: 'demo123' });
+      setCurrentUser(user);
 
-    if (newRole === 'FINANCE_APPROVER') {
-      setCurrentRoute('/finance/dashboard');
-    } else if (newRole === 'SUPPLIER') {
-      setCurrentRoute('/supplier/dashboard');
-    } else {
-      setCurrentRoute('/company/dashboard');
+      if (newRole === 'FINANCE_APPROVER') {
+        setCurrentRoute('/finance/dashboard');
+      } else if (newRole === 'SUPPLIER') {
+        setCurrentRoute('/supplier/dashboard');
+      } else {
+        setCurrentRoute('/requester/dashboard');
+      }
+
+      showToast(`Authenticated as ${user.name} (${user.role.replace('_', ' ')})`);
+      await loadAllData();
+    } catch (err: any) {
+      showToast('Could not switch session: ' + err.message, 'error');
+    } finally {
+      setIsActionLoading(false);
     }
-
-    showToast(`Switched active view to ${newRole.replace('_', ' ')}`);
   };
 
   // Procurement Handlers
@@ -187,25 +219,11 @@ export default function App() {
       const newPR = await api.createProcurement(payload);
       setRequests(prev => [newPR, ...prev]);
       setSelectedRequestId(newPR.id);
-      setCurrentRoute(`/company/procurement/${newPR.id}`);
-      showToast(`Created ${newPR.code}. AI understanding initialized.`);
+      setCurrentRoute(`/requester/requests/${newPR.id}`);
+      showToast(`Created ${newPR.code}. Request dispatched to suppliers.`);
       await loadAllData();
     } catch (err: any) {
       showToast(err.message || 'Failed to submit procurement', 'error');
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const handleUpdateUnderstanding = async (updates: any) => {
-    if (!selectedRequestId) return;
-    setIsActionLoading(true);
-    try {
-      const updated = await api.updateUnderstanding(selectedRequestId, updates);
-      setRequests(prev => prev.map(r => (r.id === updated.id ? updated : r)));
-      showToast('AI assumptions updated and inventory re-checked.');
-    } catch (err: any) {
-      showToast(err.message || 'Update failed', 'error');
     } finally {
       setIsActionLoading(false);
     }
@@ -218,10 +236,11 @@ export default function App() {
       const updated = await api.addQuote(selectedRequestId, quoteData);
       const analyzed = await api.runAIAnalysis(updated.id);
       setRequests(prev => prev.map(r => (r.id === analyzed.id ? analyzed : r)));
-      showToast('Quotation attached and AI scoring recalculated.');
+      showToast('Quotation submitted successfully.');
       await loadAllData();
+      setCurrentRoute('/supplier/dashboard');
     } catch (err: any) {
-      showToast(err.message || 'Quotation upload failed', 'error');
+      showToast(err.message || 'Quotation submission failed', 'error');
     } finally {
       setIsActionLoading(false);
     }
@@ -233,10 +252,25 @@ export default function App() {
     try {
       const analyzed = await api.runAIAnalysis(selectedRequestId);
       setRequests(prev => prev.map(r => (r.id === analyzed.id ? analyzed : r)));
-      showToast('AI multi-factor evaluation and risk analysis refreshed.');
+      showToast('AI multi-supplier comparison and recommendation refreshed.');
       await loadAllData();
     } catch (err: any) {
       showToast(err.message || 'AI analysis failed', 'error');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRequesterApprove = async (supplierId: string, note?: string) => {
+    if (!selectedRequestId) return;
+    setIsActionLoading(true);
+    try {
+      const updated = await api.requesterApprove(selectedRequestId, { supplierId, note });
+      setRequests(prev => prev.map(r => (r.id === updated.id ? updated : r)));
+      showToast('Procurement recommendation approved! Dispatched to Finance for PayPal payment.');
+      await loadAllData();
+    } catch (err: any) {
+      showToast(err.message || 'Requester approval failed', 'error');
     } finally {
       setIsActionLoading(false);
     }
@@ -269,8 +303,9 @@ export default function App() {
     setIsActionLoading(true);
     try {
       const approverName = currentUser?.name || 'Ananya Roy';
-      const updated = await api.capturePayPalPayment(selectedRequestId, orderId, approverName);
-      setRequests(prev => prev.map(r => (r.id === updated.id ? updated : r)));
+      const result = await api.capturePayPalPayment(selectedRequestId, orderId, approverName);
+      const updatedPR = (result as any).data || (result as any);
+      setRequests(prev => prev.map(r => (r.id === updatedPR.id ? updatedPR : r)));
       showToast(`Payment successfully settled via PayPal Sandbox. Status: PAID.`);
       await loadAllData();
     } catch (err: any) {
@@ -286,22 +321,40 @@ export default function App() {
       const resetPR = await api.resetDemo();
       await loadAllData();
       setSelectedRequestId(resetPR.id);
-      setCurrentRoute(`/company/procurement/${resetPR.id}`);
-      showToast('Demo scenario reset to pristine 100-chair procurement state.');
+      setCurrentRoute(`/requester/requests/${resetPR.id}`);
+      showToast('Environment successfully reset to pristine 100-chair procurement demo.');
     } catch (err: any) {
-      showToast('Failed to reset demo scenario', 'error');
+      showToast('Demo reset failed: ' + err.message, 'error');
     } finally {
       setIsResetting(false);
     }
   };
 
   const handleMarkNotificationRead = async (id: string) => {
-    await api.markNotificationRead(id);
-    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    try {
+      await api.markNotificationRead(id);
+      setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  // If not logged in, render authentication screens
+  // Render Auth Views if unauthenticated
   if (!currentUser) {
+    if (authView === 'supplier-register' || window.location.pathname === '/supplier/register') {
+      return (
+        <SupplierRegisterPage
+          onSuccess={async (newUser: User) => {
+            setCurrentUser(newUser);
+            setCurrentRoute('/supplier/dashboard');
+            showToast('Supplier registered! Welcome to your dashboard.');
+            await loadAllData();
+          }}
+          onNavigateLogin={() => setAuthView('login')}
+        />
+      );
+    }
+
     if (authView === 'register') {
       return (
         <RegisterPage
@@ -316,10 +369,16 @@ export default function App() {
     if (authView === 'forgot') {
       return (
         <ForgotPasswordPage
-          onSubmit={api.forgotPassword}
+          onSubmit={async (email: string) => {
+            const res = await api.forgotPassword(email);
+            return {
+              message: 'If an account exists with this email, a reset token has been dispatched.',
+              demoResetToken: res.demoResetToken
+            };
+          }}
           onNavigateLogin={() => setAuthView('login')}
-          onNavigateReset={token => {
-            setResetToken(token);
+          onNavigateReset={(tok: string) => {
+            setResetToken(tok);
             setAuthView('reset');
           }}
           isLoading={isActionLoading}
@@ -331,10 +390,13 @@ export default function App() {
       return (
         <ResetPasswordPage
           token={resetToken}
-          onReset={pwd => api.resetPassword({ token: resetToken, newPassword: pwd })}
+          onReset={async (newPassword: string) => {
+            await api.resetPassword({ token: resetToken, newPassword });
+            showToast('Password updated. Please sign in.');
+            setAuthView('login');
+          }}
           onNavigateLogin={() => setAuthView('login')}
           isLoading={isActionLoading}
-          errorMessage={authError}
         />
       );
     }
@@ -344,6 +406,7 @@ export default function App() {
         onLogin={handleLogin}
         onNavigateRegister={() => setAuthView('register')}
         onNavigateForgotPassword={() => setAuthView('forgot')}
+        onNavigateSupplierRegister={() => setAuthView('supplier-register')}
         isLoading={isActionLoading}
         errorMessage={authError}
       />
@@ -353,15 +416,15 @@ export default function App() {
   const selectedRequest = requests.find(r => r.id === selectedRequestId) || requests[0];
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // Role-based route guard check (Section 44)
+  // Role-based route guard check
   const isUnauthorized =
     (currentUser.role === 'COMPANY_USER' && (currentRoute.startsWith('/finance') || currentRoute.startsWith('/supplier'))) ||
-    (currentUser.role === 'SUPPLIER' && (currentRoute.startsWith('/company') || currentRoute.startsWith('/finance'))) ||
-    (currentUser.role === 'FINANCE_APPROVER' && currentRoute.startsWith('/supplier'));
+    (currentUser.role === 'SUPPLIER' && (currentRoute.startsWith('/requester') || currentRoute.startsWith('/company') || currentRoute.startsWith('/finance'))) ||
+    (currentUser.role === 'FINANCE_APPROVER' && (currentRoute.startsWith('/supplier') || currentRoute.startsWith('/requester')));
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
-      {/* Role-Specific Sidebar (Section 6 & 7 & 15 & 27) */}
+      {/* Role-Specific Sidebar */}
       <Sidebar
         currentUser={currentUser}
         currentRoute={currentRoute}
@@ -421,7 +484,7 @@ export default function App() {
                         ? '/finance/dashboard'
                         : currentUser.role === 'SUPPLIER'
                         ? '/supplier/dashboard'
-                        : '/company/dashboard'
+                        : '/requester/dashboard'
                     )
                   }
                   className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200"
@@ -445,133 +508,65 @@ export default function App() {
             </div>
           ) : (
             <>
-              {/* COMPANY PORTAL ROUTES */}
-              {currentRoute === '/company/dashboard' && (
-                <CompanyDashboard
+              {/* 1. REQUESTER ROUTES */}
+              {(currentRoute === '/requester/dashboard' || currentRoute === '/company/dashboard' || currentRoute === '/requester/requests') && (
+                <RequesterDashboard
                   requests={requests}
-                  suppliers={suppliers}
+                  onCreateNew={() => setCurrentRoute('/requester/request/new')}
                   onSelectRequest={id => {
                     setSelectedRequestId(id);
-                    setCurrentRoute(`/company/procurement/${id}`);
+                    setCurrentRoute(`/requester/requests/${id}`);
                   }}
-                  onNavigateNewRequest={() => setCurrentRoute('/company/procurement/new')}
-                  onNavigateSuppliers={() => setCurrentRoute('/company/suppliers')}
-                  onNavigateInventory={() => setCurrentRoute('/company/inventory')}
                 />
               )}
 
-              {currentRoute === '/company/procurement/new' && (
-                <CreateProcurementPage
-                  inventory={inventory}
+              {(currentRoute === '/requester/request/new' || currentRoute === '/company/procurement/new') && (
+                <CreateRequestPage
+                  suppliers={suppliers}
                   onSubmit={handleCreateProcurement}
-                  onCancel={() => setCurrentRoute('/company/dashboard')}
+                  onCancel={() => setCurrentRoute('/requester/dashboard')}
                   isSubmitting={isActionLoading}
                 />
               )}
 
-              {(currentRoute === '/company/procurement' || currentRoute.startsWith('/company/procurement/')) &&
-                !currentRoute.endsWith('/compare') &&
-                currentRoute !== '/company/procurement/new' &&
-                selectedRequest && (
-                  <div className="space-y-4">
-                    <div className="flex justify-end">
-                      <button
-                        onClick={() => setCurrentRoute(`/company/procurement/${selectedRequest.id}/compare`)}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200"
-                      >
-                        Open Supplier Comparison Table →
-                      </button>
-                    </div>
-                    <ProcurementDetailView
-                      request={selectedRequest}
-                      currentRole={currentUser.role}
-                      onUpdateUnderstanding={handleUpdateUnderstanding}
-                      onAddQuote={handleAddQuote}
-                      onRunAIAnalysis={handleRunAIAnalysis}
-                      onSubmitApproval={handleSubmitApproval}
-                      onExecutePayment={handleExecutePayment}
-                      onBackToDashboard={() => setCurrentRoute('/company/dashboard')}
-                      isActionLoading={isActionLoading}
-                    />
-                  </div>
-                )}
-
-              {currentRoute.endsWith('/compare') && selectedRequest && (
-                <SupplierComparisonPage
+              {(currentRoute.startsWith('/requester/requests/') || currentRoute.startsWith('/company/procurement/')) && selectedRequest && (
+                <RequesterRequestDetail
                   request={selectedRequest}
-                  onBack={() => setCurrentRoute(`/company/procurement/${selectedRequest.id}`)}
+                  onBack={() => setCurrentRoute('/requester/dashboard')}
+                  onRunAIAnalysis={handleRunAIAnalysis}
+                  onApprove={handleRequesterApprove}
+                  isActionLoading={isActionLoading}
                 />
               )}
 
-              {currentRoute === '/company/inventory' && (
-                <InventoryView items={inventory} onRefresh={loadAllData} />
+              {/* 2. SUPPLIER ROUTES */}
+              {(currentRoute === '/supplier/dashboard' ||
+                currentRoute === '/supplier/requests' ||
+                currentRoute === '/supplier/quotes' ||
+                currentRoute === '/supplier/orders' ||
+                currentRoute === '/supplier/payments') && (
+                <SupplierDashboard
+                  requests={requests}
+                  currentUser={currentUser}
+                  onSelectRFQ={id => {
+                    setSelectedRequestId(id);
+                    setCurrentRoute(`/supplier/quote/${id}`);
+                  }}
+                />
               )}
 
-              {currentRoute === '/company/suppliers' && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-                    <h2 className="text-base font-bold text-slate-900">Enrolled Supplier Directory</h2>
-                    <span className="text-xs font-mono text-slate-500">{suppliers.length} Qualified Vendors</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {suppliers.map(s => (
-                      <div key={s.id} className="p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="font-bold text-slate-900">{s.name}</span>
-                          <span className="font-mono text-[10px] text-slate-400">{s.code}</span>
-                        </div>
-                        <div className="text-slate-600">{s.address}</div>
-                        <div className="pt-2 border-t border-slate-100 flex justify-between font-mono text-[11px]">
-                          <span className="text-slate-500">Rating: {s.performance.overallRating}/100</span>
-                          <span className="text-emerald-700 font-bold">{s.performance.onTimeDeliveryRate}% on-time</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {(currentRoute.startsWith('/supplier/quote/') || currentRoute.startsWith('/supplier/procurements/')) && selectedRequest && (
+                <SupplierQuotationPage
+                  request={selectedRequest}
+                  currentUser={currentUser}
+                  onSubmitQuote={handleAddQuote}
+                  onBack={() => setCurrentRoute('/supplier/dashboard')}
+                  isSubmitting={isActionLoading}
+                />
               )}
 
-              {currentRoute === '/company/quotes' && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-                  <h2 className="text-base font-bold text-slate-900">Quotations Management Hub</h2>
-                  <p className="text-xs text-slate-500">
-                    All normalized proposals currently active across open requests.
-                  </p>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs font-mono">
-                      <thead className="bg-slate-50 border-b border-slate-200 uppercase text-[10px] text-slate-500 font-semibold font-sans">
-                        <tr>
-                          <th className="px-4 py-3">Supplier</th>
-                          <th className="px-4 py-3">Product</th>
-                          <th className="px-4 py-3 text-right">Unit Price</th>
-                          <th className="px-4 py-3 text-right">Grand Total</th>
-                          <th className="px-4 py-3 text-center">Lead Time</th>
-                          <th className="px-4 py-3 text-center">AI Score</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {requests.flatMap(r => r.quotes || []).map(q => (
-                          <tr key={q.id} className="hover:bg-slate-50">
-                            <td className="px-4 py-3 font-sans font-bold text-slate-900">{q.supplierName}</td>
-                            <td className="px-4 py-3 font-sans text-slate-700">{q.productName}</td>
-                            <td className="px-4 py-3 text-right">₹{q.unitPrice.toLocaleString('en-IN')}</td>
-                            <td className="px-4 py-3 text-right font-bold">₹{q.grandTotal.toLocaleString('en-IN')}</td>
-                            <td className="px-4 py-3 text-center">{q.deliveryDays} Days</td>
-                            <td className="px-4 py-3 text-center font-bold text-indigo-700">{q.scores?.compositeScore || '—'}/100</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {currentRoute === '/company/analytics' && (
-                <CompanyAnalyticsPage requests={requests} suppliers={suppliers} />
-              )}
-
-              {/* FINANCE PORTAL ROUTES */}
-              {currentRoute === '/finance/dashboard' && (
+              {/* 3. FINANCE ROUTES */}
+              {(currentRoute === '/finance/dashboard' || currentRoute === '/finance/pending') && (
                 <FinanceDashboard
                   requests={requests}
                   payments={payments}
@@ -580,7 +575,6 @@ export default function App() {
                     setCurrentRoute(`/finance/approvals/${id}`);
                   }}
                   onNavigatePayments={() => setCurrentRoute('/finance/payments')}
-                  onNavigateAudit={() => setCurrentRoute('/finance/audit')}
                 />
               )}
 
@@ -605,122 +599,7 @@ export default function App() {
                 />
               )}
 
-              {currentRoute === '/finance/reports' && (
-                <FinanceReportsPage requests={requests} suppliers={suppliers} />
-              )}
-
-              {currentRoute === '/finance/audit' && (
-                <FinanceAuditPage logs={auditLogs} />
-              )}
-
-              {/* SUPPLIER PORTAL ROUTES */}
-              {currentRoute === '/supplier/dashboard' && (
-                <SupplierDashboard
-                  requests={requests}
-                  currentUser={currentUser}
-                  onSelectRFQ={id => {
-                    setSelectedRequestId(id);
-                    setCurrentRoute(`/supplier/procurements/${id}`);
-                  }}
-                />
-              )}
-
-              {currentRoute.startsWith('/supplier/procurements') && selectedRequest && (
-                <SupplierQuotationPage
-                  request={selectedRequest}
-                  currentUser={currentUser}
-                  onSubmitQuote={handleAddQuote}
-                  onBack={() => setCurrentRoute('/supplier/dashboard')}
-                  isSubmitting={isActionLoading}
-                />
-              )}
-
-              {currentRoute === '/supplier/orders' && selectedRequest && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-                  <h2 className="text-base font-bold text-slate-900">Supplier Purchase Orders</h2>
-                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2 font-mono">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 font-sans">PO Number:</span>
-                      <span className="font-bold text-slate-900">{selectedRequest.code}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 font-sans">Buyer:</span>
-                      <span className="font-sans font-medium text-slate-800">Acme Technologies Pvt Ltd</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 font-sans">Allocated Units:</span>
-                      <span>{selectedRequest.recommendation?.recommendedQuantity || 65} Units</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 font-sans">Total Order Value:</span>
-                      <span className="font-bold text-emerald-600">
-                        ₹{(selectedRequest.recommendation?.recommendedAmount || 178490).toLocaleString('en-IN')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 font-sans">Delivery Deadline:</span>
-                      <span>{selectedRequest.deliveryDeadlineDate}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {currentRoute === '/supplier/payments' && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-                  <h2 className="text-base font-bold text-slate-900">PayPal Received Settlements</h2>
-                  <p className="text-xs text-slate-500">
-                    Disbursements completed via corporate PayPal Sandbox checkout.
-                  </p>
-                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-xs font-mono space-y-2 text-emerald-900">
-                    <div className="flex justify-between">
-                      <span>Status:</span>
-                      <span className="font-bold">SETTLED IN SANDBOX</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Beneficiary Account:</span>
-                      <span>billing@apex-ergo.com</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Settlement Total:</span>
-                      <span className="font-bold">₹1,78,490</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* COMMON ROUTES */}
-              {currentRoute === '/notifications' && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-                    <h2 className="text-base font-bold text-slate-900">Notifications & Alerts</h2>
-                    <span className="text-xs text-slate-500 font-mono">{unreadCount} Unread</span>
-                  </div>
-                  <div className="space-y-3">
-                    {notifications.map(n => (
-                      <div
-                        key={n.id}
-                        className={`p-4 rounded-xl border text-xs flex justify-between items-center ${
-                          n.read ? 'bg-slate-50 text-slate-600' : 'bg-indigo-50/50 border-indigo-200 font-medium'
-                        }`}
-                      >
-                        <div>
-                          <div className="font-bold text-slate-900">{n.title}</div>
-                          <div className="text-slate-600 mt-0.5">{n.message}</div>
-                        </div>
-                        {!n.read && (
-                          <button
-                            onClick={() => handleMarkNotificationRead(n.id)}
-                            className="text-[11px] text-indigo-600 font-semibold hover:underline shrink-0"
-                          >
-                            Mark Read
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {(currentRoute === '/profile' || currentRoute === '/settings') && (
                 <ProfileSettingsPage
                   currentUser={currentUser}

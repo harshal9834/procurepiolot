@@ -11,6 +11,18 @@ export const FinanceReportsPage: React.FC<FinanceReportsPageProps> = ({
   requests,
   suppliers
 }) => {
+  const totalDecided = requests.filter(r => r.status === 'APPROVED' || r.status === 'REJECTED' || r.status === 'PAID').length;
+  const approvedCount = requests.filter(r => r.status === 'APPROVED' || r.status === 'PAID').length;
+  const rejectedCount = requests.filter(r => r.status === 'REJECTED').length;
+
+  const approvedRate = totalDecided > 0 ? ((approvedCount / totalDecided) * 100).toFixed(1) + '%' : '100%';
+  const rejectionRate = totalDecided > 0 ? ((rejectedCount / totalDecided) * 100).toFixed(1) + '%' : '0.0%';
+
+  const capitalSaved = requests.reduce(
+    (acc, r) => acc + (r.inventoryCheck?.inventorySavingsAmount || 0),
+    0
+  );
+
   return (
     <div className="space-y-6">
       <div className="pb-4 border-b border-slate-200">
@@ -26,25 +38,25 @@ export const FinanceReportsPage: React.FC<FinanceReportsPageProps> = ({
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
           <div className="text-xs text-slate-500 font-medium">Approved Spend Rate</div>
           <div className="mt-1 text-2xl font-bold text-slate-900 font-mono tabular-nums">
-            92.8%
+            {approvedRate}
           </div>
-          <div className="text-[11px] text-emerald-600 mt-0.5">Within fiscal tolerance</div>
+          <div className="text-[11px] text-emerald-600 mt-0.5">{approvedCount} of {totalDecided || 1} requests approved</div>
         </div>
 
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
-          <div className="text-xs text-slate-500 font-medium">Rejection / Renegotiation</div>
+          <div className="text-xs text-slate-500 font-medium">Rejection Rate</div>
           <div className="mt-1 text-2xl font-bold text-amber-600 font-mono tabular-nums">
-            7.2%
+            {rejectionRate}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Delivery or price variance</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">{rejectedCount} requests returned</div>
         </div>
 
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
           <div className="text-xs text-slate-500 font-medium">Capital Saved via Depot Reuse</div>
           <div className="mt-1 text-2xl font-bold text-emerald-600 font-mono tabular-nums">
-            ₹77,000
+            ₹{capitalSaved > 0 ? capitalSaved.toLocaleString('en-IN') : '0'}
           </div>
-          <div className="text-[11px] text-emerald-700 mt-0.5">PR-2026-00001 chair deduction</div>
+          <div className="text-[11px] text-emerald-700 mt-0.5">Automated warehouse deductions</div>
         </div>
 
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">

@@ -33,6 +33,21 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
   const pendingCount = requests.filter(r => r.status === 'PENDING_APPROVAL' || r.status === 'AI_RECOMMENDED').length;
   const highRiskSuppliers = suppliers.filter(s => s.performance.riskLevel === 'HIGH' || s.performance.riskLevel === 'CRITICAL').length;
 
+  const totalSpendVal = requests
+    .filter(r => r.status === 'PAID' || r.status === 'APPROVED')
+    .reduce((acc, r) => acc + (r.recommendation?.recommendedAmount || 0), 0);
+  const totalSpendFormatted = totalSpendVal > 0 
+    ? `₹${(totalSpendVal / 100000).toFixed(1)}L` 
+    : '₹0.0L';
+
+  const totalSavingsVal = requests.reduce(
+    (acc, r) => acc + (r.inventoryCheck?.inventorySavingsAmount || 0),
+    0
+  );
+  const totalSavingsFormatted = totalSavingsVal > 0 
+    ? `₹${(totalSavingsVal / 100000).toFixed(1)}L` 
+    : '₹0.0L';
+
   return (
     <div className="space-y-6">
       {/* Top Header & Quick Action Buttons */}
@@ -62,15 +77,15 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
           <div className="text-[11px] text-slate-500 font-medium">Active Requests</div>
           <div className="mt-1.5 text-xl font-bold text-slate-900 font-mono tabular-nums">
-            {activeCount || 12}
+            {activeCount}
           </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Across 4 departments</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">In active lifecycle</div>
         </div>
 
         <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
           <div className="text-[11px] text-amber-600 font-medium">Pending Approvals</div>
           <div className="mt-1.5 text-xl font-bold text-amber-600 font-mono tabular-nums">
-            {pendingCount || 4}
+            {pendingCount}
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5">In Treasury queue</div>
         </div>
@@ -78,15 +93,15 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
           <div className="text-[11px] text-slate-500 font-medium">Total Spend</div>
           <div className="mt-1.5 text-xl font-bold text-slate-900 font-mono tabular-nums">
-            ₹12.4L
+            {totalSpendFormatted}
           </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Year to date</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">Committed capital</div>
         </div>
 
         <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
           <div className="text-[11px] text-emerald-600 font-medium">Estimated Savings</div>
           <div className="mt-1.5 text-xl font-bold text-emerald-600 font-mono tabular-nums">
-            ₹1.8L
+            {totalSavingsFormatted}
           </div>
           <div className="text-[10px] text-emerald-700 mt-0.5">Inventory reuse + TCO</div>
         </div>
@@ -94,7 +109,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
           <div className="text-[11px] text-slate-500 font-medium">Supplier Count</div>
           <div className="mt-1.5 text-xl font-bold text-slate-900 font-mono tabular-nums">
-            {suppliers.length || 3}
+            {suppliers.length}
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5">Active catalog</div>
         </div>
@@ -102,7 +117,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
           <div className="text-[11px] text-rose-600 font-medium">High-Risk Suppliers</div>
           <div className="mt-1.5 text-xl font-bold text-rose-600 font-mono tabular-nums">
-            {highRiskSuppliers || 1}
+            {highRiskSuppliers}
           </div>
           <div className="text-[10px] text-rose-700 mt-0.5">Flagged for delay/terms</div>
         </div>

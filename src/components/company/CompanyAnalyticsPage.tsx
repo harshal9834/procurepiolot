@@ -11,6 +11,43 @@ export const CompanyAnalyticsPage: React.FC<CompanyAnalyticsPageProps> = ({
   requests,
   suppliers
 }) => {
+  const approvedOrPaid = requests.filter(r => r.status === 'APPROVED' || r.status === 'PAID');
+  const paidCount = requests.filter(r => r.status === 'PAID').length;
+
+  const totalSpend = approvedOrPaid.reduce(
+    (acc, r) => acc + (r.recommendation?.recommendedAmount || 0),
+    0
+  );
+
+  const totalSavings = requests.reduce(
+    (acc, r) => acc + (r.inventoryCheck?.inventorySavingsAmount || 0),
+    0
+  );
+
+  const averageAOV = approvedOrPaid.length > 0
+    ? Math.round(totalSpend / approvedOrPaid.length)
+    : 0;
+
+  // Real Category Breakdown
+  const catMap: Record<string, number> = {};
+  requests.forEach(r => {
+    const cat = r.category || 'General Procurement';
+    const amount = r.recommendation?.recommendedAmount || r.maxBudget;
+    catMap[cat] = (catMap[cat] || 0) + amount;
+  });
+
+  const sumCategorySpend = Object.values(catMap).reduce((a, b) => a + b, 0) || 1;
+  const categoriesList = Object.entries(catMap).map(([name, amount], index) => {
+    const colors = ['bg-indigo-600', 'bg-blue-600', 'bg-emerald-600', 'bg-amber-600', 'bg-purple-600'];
+    const pct = Math.round((amount / sumCategorySpend) * 100);
+    return {
+      name,
+      amount,
+      pct,
+      color: colors[index % colors.length]
+    };
+  });
+
   return (
     <div className="space-y-6">
       <div className="pb-4 border-b border-slate-200">
@@ -22,22 +59,22 @@ export const CompanyAnalyticsPage: React.FC<CompanyAnalyticsPageProps> = ({
         </p>
       </div>
 
-      {/* KPI Cards matching Section 38 */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
-          <div className="text-xs text-slate-500 font-medium">Total Spend (YTD)</div>
+          <div className="text-xs text-slate-500 font-medium">Total Authorized Spend</div>
           <div className="mt-1 text-2xl font-bold text-slate-900 font-mono tabular-nums">
-            ₹12.4L
+            ₹{totalSpend > 0 ? (totalSpend / 100000).toFixed(1) + 'L' : '₹0.0L'}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Across 42 completed POs</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Across {approvedOrPaid.length} approved PRs ({paidCount} settled)</div>
         </div>
 
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
           <div className="text-xs text-emerald-600 font-medium">Autonomous AI Savings</div>
           <div className="mt-1 text-2xl font-bold text-emerald-600 font-mono tabular-nums">
-            ₹1.8L
+            ₹{totalSavings > 0 ? (totalSavings / 100000).toFixed(1) + 'L' : '₹0.0L'}
           </div>
-          <div className="text-[11px] text-emerald-700 mt-0.5">+14.5% bottom-line impact</div>
+          <div className="text-[11px] text-emerald-700 mt-0.5">From depot inventory deduplication</div>
         </div>
 
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
@@ -45,15 +82,15 @@ export const CompanyAnalyticsPage: React.FC<CompanyAnalyticsPageProps> = ({
           <div className="mt-1 text-2xl font-bold text-indigo-600 font-mono tabular-nums">
             1.4 Days
           </div>
-          <div className="text-[11px] text-indigo-700 mt-0.5">Down from 9.2 days legacy</div>
+          <div className="text-[11px] text-indigo-700 mt-0.5">AI accelerated routing</div>
         </div>
 
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
           <div className="text-xs text-slate-500 font-medium">Average Order Value</div>
           <div className="mt-1 text-2xl font-bold text-slate-900 font-mono tabular-nums">
-            ₹1,62,400
+            ₹{averageAOV > 0 ? averageAOV.toLocaleString('en-IN') : '0'}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Commercial median</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Mean transaction value</div>
         </div>
       </div>
 
@@ -66,45 +103,17 @@ export const CompanyAnalyticsPage: React.FC<CompanyAnalyticsPageProps> = ({
           </h2>
 
           <div className="space-y-3 text-xs">
-            <div>
-              <div className="flex justify-between font-medium text-slate-700 mb-1">
-                <span>Office Furniture & Ergonomics</span>
-                <span className="font-mono">₹5,40,000 (43%)</span>
+            {categoriesList.map(cat => (
+              <div key={cat.name}>
+                <div className="flex justify-between font-medium text-slate-700 mb-1">
+                  <span>{cat.name}</span>
+                  <span className="font-mono">₹{cat.amount.toLocaleString('en-IN')} ({cat.pct}%)</span>
+                </div>
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`h-full ${cat.color} rounded-full`} style={{ width: `${cat.pct}%` }} />
+                </div>
               </div>
-              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-600 rounded-full" style={{ width: '43%' }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between font-medium text-slate-700 mb-1">
-                <span>IT Hardware & Developer Laptops</span>
-                <span className="font-mono">₹4,20,000 (34%)</span>
-              </div>
-              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full" style={{ width: '34%' }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between font-medium text-slate-700 mb-1">
-                <span>Displays & AV Peripherals</span>
-                <span className="font-mono">₹1,80,000 (14%)</span>
-              </div>
-              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-600 rounded-full" style={{ width: '14%' }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between font-medium text-slate-700 mb-1">
-                <span>Facility Infrastructure</span>
-                <span className="font-mono">₹1,00,000 (9%)</span>
-              </div>
-              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-600 rounded-full" style={{ width: '9%' }} />
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 

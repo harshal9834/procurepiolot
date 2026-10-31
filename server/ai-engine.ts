@@ -40,11 +40,30 @@ export async function understandProcurementRequest(
     ? 'Enterprise 14" Developer Laptop Core i7 32GB'
     : naturalText.split(',')[0].slice(0, 40) || 'Commercial Office Equipment';
 
+  // Deterministic extraction from natural text for robust offline fallback
+  let inferredDays = userMetadata?.deliveryDays;
+  if (!inferredDays) {
+    const dayMatch = naturalText.match(/(\d+)\s*(?:days?|working days?)/i);
+    if (dayMatch) inferredDays = parseInt(dayMatch[1], 10);
+  }
+
+  let inferredQty = userMetadata?.requestedQuantity;
+  if (!inferredQty) {
+    const qtyMatch = naturalText.match(/(\d+)\s*(?:units?|pcs?|pieces?|chairs?|items?|laptops?)/i);
+    if (qtyMatch) inferredQty = parseInt(qtyMatch[1], 10);
+  }
+
+  let inferredBudget = userMetadata?.budget;
+  if (!inferredBudget) {
+    const budgetMatch = naturalText.match(/(?:₹|rs\.?|inr|budget\s*(?:of|around|is)?)\s*([\d,]+)/i);
+    if (budgetMatch) inferredBudget = parseInt(budgetMatch[1].replace(/,/g, ''), 10);
+  }
+
   const defaultUnderstanding: AiUnderstanding = {
     parsedItem: fallbackItem,
-    normalizedQuantity: userMetadata?.requestedQuantity || 100,
-    extractedBudget: userMetadata?.budget || 250000,
-    deliveryRequirementDays: userMetadata?.deliveryDays || 10,
+    normalizedQuantity: inferredQty || userMetadata?.requestedQuantity || 100,
+    extractedBudget: inferredBudget || userMetadata?.budget || 250000,
+    deliveryRequirementDays: inferredDays || userMetadata?.deliveryDays || 15,
     priority: 'high',
     qualityRequirements: [
       'Commercial grade durability & high duty-cycle rating',

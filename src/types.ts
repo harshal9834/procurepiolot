@@ -2,15 +2,22 @@ export type UserRole = 'COMPANY_USER' | 'FINANCE_APPROVER' | 'SUPPLIER';
 
 export type ProcurementStatus =
   | 'DRAFT'
+  | 'REQUEST_SENT'
+  | 'QUOTES_RECEIVING'
+  | 'AI_ANALYZING'
+  | 'AI_RECOMMENDED'
+  | 'AWAITING_REQUESTER_APPROVAL'
+  | 'AWAITING_FINANCE'
+  | 'PAYMENT_PENDING'
+  | 'PAID'
+  | 'REJECTED'
+  | 'PAYMENT_FAILED'
+  | 'CANCELLED'
   | 'ANALYZING'
   | 'QUOTES_PENDING'
   | 'ANALYZED'
-  | 'AI_RECOMMENDED'
   | 'PENDING_APPROVAL'
   | 'APPROVED'
-  | 'REJECTED'
-  | 'PAYMENT_PENDING'
-  | 'PAID'
   | 'COMPLETED';
 
 export type QuotationStatus =
@@ -107,6 +114,9 @@ export interface Supplier {
   phone: string;
   address: string;
   categories: string[];
+  productsSupplied?: string[];
+  description?: string;
+  website?: string;
   performance: SupplierPerformance;
   paymentTerms: string;
   gstNumber?: string;
@@ -231,6 +241,36 @@ export interface AuditLogEntry {
   procurementId?: string;
 }
 
+export interface SupplierDocumentRecord {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  filename: string;
+  fileType: string;
+  filePath: string;
+  documentType: 'CATALOG' | 'PRICE_LIST' | 'WARRANTY' | 'SPECIFICATION' | 'CERTIFICATION' | 'QUOTATION' | 'OTHER';
+  fileSizeBytes: number;
+  extractionStatus: 'UPLOADED' | 'PROCESSING' | 'PROCESSED' | 'FAILED';
+  errorMessage?: string;
+  totalChunks: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RAGAnswerResponse {
+  query: string;
+  answer: string;
+  confidence: number;
+  evidence: Array<{
+    supplierId: string;
+    supplierName: string;
+    documentName: string;
+    pageNumber: number;
+    snippet: string;
+    score: number;
+  }>;
+}
+
 export interface AppNotification {
   id: string;
   userId?: string;
@@ -267,6 +307,16 @@ export interface ProcurementRequest {
   createdAt: string;
   updatedAt: string;
   status: ProcurementStatus;
+
+  // Simple Workflow & Targeting
+  targetSupplierMode?: 'ALL_RELEVANT' | 'SPECIFIC';
+  assignedSupplierIds?: string[];
+  selectedSupplierId?: string;
+  selectedQuoteId?: string;
+  requesterApprovedAt?: string;
+  requesterApprovedBy?: string;
+  financeApprovedAt?: string;
+  financeApprovedBy?: string;
   aiUnderstanding?: AiUnderstanding;
   inventoryCheck?: {
     itemFound: boolean;
